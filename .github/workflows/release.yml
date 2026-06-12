@@ -45,9 +45,28 @@ jobs:
 
       - name: Python Semantic Release
         id: release
-        uses: python-semantic-release/python-semantic-release@v9
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Run semantic-release as a CLI (installed via .[dev]) rather than the
+          # Docker container action. The action pushes over HTTPS as
+          # github-actions[bot], which the protected-main ruleset rejects. The
+          # CLI pushes over the SSH remote configured by checkout (ssh-key),
+          # authenticating as the release deploy key — a bypass actor on the
+          # ruleset. GH_TOKEN is still used for the GitHub Release API.
+          git config user.name "Welchost Contributors"
+          git config user.email "noreply@welchost.dev"
+          prev="$(git describe --tags --abbrev=0 2>/dev/null || echo none)"
+          semantic-release -v version
+          curr="$(git describe --tags --abbrev=0 2>/dev/null || echo none)"
+          if [ "$curr" != "$prev" ]; then
+            echo "released=true" >> "$GITHUB_OUTPUT"
+            echo "version=${curr#v}" >> "$GITHUB_OUTPUT"
+            semantic-release -v publish
+          else
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            echo "No release: no version-bumping commits since $prev."
+          fi
 
       - name: Publish to PyPI
         if: steps.release.outputs.released == 'true'
