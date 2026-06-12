@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import Center, Horizontal, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Static
 
@@ -25,15 +25,32 @@ class Wizard(Screen):
     ]
 
     CSS = """
-    Wizard #wizard-body { width: 76; max-width: 100%; padding: 1 2; }
+    Wizard #wizard-body { width: 100%; height: 1fr; }
+    /* Form on the left, live preview on the right, each scrolls on its own so a
+       short terminal never buries the inputs under the preview. */
+    Wizard #form-col { width: 56; max-width: 60%; height: 1fr; }
+    /* Only the step content scrolls; the nav row is a non-scrolling sibling
+       pinned below it, so the buttons stay visible no matter how long a step is. */
+    Wizard #form-scroll { height: 1fr; padding: 1 2; }
+    Wizard #preview-col { width: 1fr; padding: 1 2; height: 1fr; border-left: round $panel; }
     Wizard #progress { text-style: bold; padding: 0 0 1 0; }
-    Wizard #steps > * { display: none; }
+    Wizard #steps { height: auto; }
+    /* Steps and their inner boxes must grow to their content (Textual's Vertical
+       defaults to height:1fr, which inside the scroll collapses to the viewport
+       and clips controls below the fold — e.g. the gradient direction picker).
+       height:auto lets the VerticalScroll measure the full content and scroll. */
+    Wizard #steps > * { display: none; height: auto; }
+    Wizard #steps Vertical { height: auto; }
     Wizard .info-row { layout: horizontal; height: auto; padding: 0 0; }
     Wizard .info-label { padding: 1 0 0 1; }
-    Wizard Input, Wizard Select, Wizard RadioSet { margin: 0 0 1 0; }
-    Wizard #font_list { height: 8; border: round $panel; }
-    Wizard #nav { height: auto; padding: 1 0; align-horizontal: left; }
-    Wizard #nav Button { margin: 0 2 0 0; }
+    Wizard Input, Wizard Select { width: 48; margin: 0 0 1 0; }
+    Wizard RadioSet { margin: 0 0 1 0; }
+    Wizard #nav { height: auto; padding: 1 2; border-top: round $panel; }
+    /* back pinned left, the spacer eats the slack, next/save pushed to the far
+       right. */
+    Wizard #nav-spacer { width: 1fr; height: 0; }
+    Wizard #back { margin: 0 2 0 0; }
+    Wizard #next, Wizard #save { margin: 0 0 0 2; }
     Wizard BannerPreview { margin: 1 0 0 0; }
     """
 
@@ -43,15 +60,18 @@ class Wizard(Screen):
         self.steps = [StepTextFont(), StepColor(), StepDecoration(), StepConfirm()]
 
     def compose(self) -> ComposeResult:
-        with Center():
-            with VerticalScroll(id="wizard-body"):
-                yield Static(id="progress")
-                with VerticalScroll(id="steps"):
-                    yield from self.steps
+        with Horizontal(id="wizard-body"):
+            with Vertical(id="form-col"):
+                with VerticalScroll(id="form-scroll"):
+                    yield Static(id="progress")
+                    with Vertical(id="steps"):
+                        yield from self.steps
                 with Horizontal(id="nav"):
                     yield Button("← back", id="back", compact=True)
+                    yield Static(id="nav-spacer")
                     yield Button("next →", id="next", variant="primary", compact=True)
                     yield Button("save & install", id="save", variant="success", compact=True)
+            with VerticalScroll(id="preview-col"):
                 yield Static("live preview", classes="panel-title")
                 yield BannerPreview()
         yield Footer()
@@ -74,11 +94,16 @@ class Wizard(Screen):
         self.query_one("#save", Button).display = last
         self.query_one("#back", Button).disabled = self.index == 0
         self._focus_first(current)
+        # Start each step at the top — otherwise the previous step's scroll offset
+        # carries over and the new step opens part-way down.
+        self.query_one("#form-scroll", VerticalScroll).scroll_home(animate=False)
 
     def _focus_first(self, step) -> None:
         for widget in step.query("*"):
             if getattr(widget, "focusable", False):
-                widget.focus()
+                # scroll_visible=False so focusing the first control doesn't pull
+                # the view down past the step's heading; _show_step resets to top.
+                widget.focus(scroll_visible=False)
                 return
 
     def action_prev(self) -> None:

@@ -9,6 +9,7 @@ from textual.widget import Widget
 from textual.widgets import Footer, Label, ListItem, ListView, Static
 
 from ... import detect
+from ...generator import SENTINEL_START
 from ...themes import ACCENT
 from ..logo import Logo
 
@@ -17,6 +18,11 @@ class _Menu(Screen):
     """Base list-driven menu screen. Fully keyboard-driven."""
 
     BINDINGS = [("escape", "app.pop_screen", "Back")]
+
+    CSS = """
+    _Menu #menu, _Menu #menu > ListItem { background: transparent; }
+    _Menu #menu:focus > ListItem.-highlighted { background: $boost; }
+    """
 
     def items(self) -> list[tuple[str, str]]:  # (id, label)
         raise NotImplementedError
@@ -44,6 +50,51 @@ class _Menu(Screen):
     def handle(self, key: str) -> None:
         raise NotImplementedError
 
+    def confirm(self, message: str, *, yes_label: str, on_yes) -> None:
+        """Push a yes/no ConfirmModal and run ``on_yes`` only if confirmed."""
+        from .modals import ConfirmModal
+
+        def on_result(confirmed: bool | None) -> None:
+            if confirmed:
+                on_yes()
+
+        self.app.push_screen(
+            ConfirmModal(message, yes_label=yes_label, no_label="cancel"),
+            on_result,
+        )
+
+    def confirm_reset(self, *, verb: str, done_label: str) -> None:
+        """Confirm, then remove all welchost files, clear in-memory state, and
+        return to the main menu. Shared by MainMenu's reset and EditMenu's delete
+        so both use the same modal, wording, and post-action behavior. ``verb`` is
+        the imperative used in the prompt/button ("Delete"); ``done_label`` is the
+        past-tense word used in the result toast ("Deleted")."""
+        from ...generator import reset as do_reset
+
+        def on_yes() -> None:
+            removed = do_reset()
+            self.app.clear_config()
+            if removed:
+                names = ", ".join(p.name for p in removed)
+                self.app.notify(f"{done_label} — removed {names}.", timeout=6)
+            else:
+                self.app.notify("Nothing to remove.", timeout=6)
+            self.app.switch_screen(MainMenu())
+
+        self.confirm(
+            f"{verb} your [bold]welcome screen[/bold]?\n"
+            f"[dim]Removes {_reset_target()}. This cannot be undone.[/dim]",
+            yes_label=verb.lower(),
+            on_yes=on_yes,
+        )
+
+
+def _reset_target() -> str:
+    """One source of truth for the reset/delete scope wording."""
+    return (
+        "the dev-home sandbox" if detect.is_dev() else "all welchost files and the ~/.zshrc block"
+    )
+
 
 class MainMenu(_Menu):
     """Shown when there is no existing config."""
@@ -69,14 +120,70 @@ class MainMenu(_Menu):
         elif key == "doctor":
             self.app.push_screen(DoctorScreen())
         elif key == "reset":
-            self.app.push_screen(ResetScreen())
+            self.confirm_reset(verb="Reset", done_label="Reset")
 
 
 class EditMenu(_Menu):
-    """Shown when a config already exists."""
+    """Top-level menu shown when a config already exists.
+
+    Branded like the main menu (logo) with an explicit indication that a welcome
+    screen is active, then a clean choice: edit current vs create a new one.
+    """
 
     def header_widget(self) -> Widget:
-        return Static("~/welchost ❯ edit", classes="section-label")
+        m = self.app.model
+        color = "gradient" if m.banner.color_mode == "gradient" else m.solid.value
+        summary = f"{m.banner.text} · {m.banner.font} · {color}"
+        return Vertical(
+            Logo(),
+            Static(f"[{ACCENT}]●[/] welcome screen active", classes="section-label"),
+            Static(f"[dim]{summary}[/dim]", classes="hint"),
+            id="edit-header",
+        )
+
+    def items(self) -> list[tuple[str, str]]:
+        a = f"[{ACCENT}]"
+        return [
+            ("edit", f"{a}▸[/]  edit current"),
+            ("new", f"{a}▸[/]  create new  [dim](replaces current)[/dim]"),
+            ("preview", f"{a}▸[/]  preview current"),
+            ("doctor", f"{a}▸[/]  doctor"),
+            ("delete", f"{a}▸[/]  delete welcome screen"),
+        ]
+
+    def handle(self, key: str) -> None:
+        if key == "edit":
+            self.app.push_screen(EditCurrentMenu())
+        elif key == "new":
+            self._confirm_create_new()
+        elif key == "preview":
+            self.app.push_screen(PreviewScreen())
+        elif key == "doctor":
+            self.app.push_screen(DoctorScreen())
+        elif key == "delete":
+            self.confirm_reset(verb="Delete", done_label="Deleted")
+
+    def _confirm_create_new(self) -> None:
+        def on_yes() -> None:
+            # New build: only the editor resets; the installed files stay until a
+            # save, so had_config is deliberately left untouched (app.new_draft).
+            self.app.new_draft()
+            self.app.switch_screen(MainMenu())
+
+        self.confirm(
+            "Start a [bold]new welcome screen[/bold]?\n"
+            "[dim]This discards your current settings. Installed files and "
+            "~/.zshrc only change when you save.[/dim]",
+            yes_label="create new",
+            on_yes=on_yes,
+        )
+
+
+class EditCurrentMenu(_Menu):
+    """Granular edit options for the existing welcome screen."""
+
+    def header_widget(self) -> Widget:
+        return Static("~/welchost ❯ edit current", classes="section-label")
 
     def items(self) -> list[tuple[str, str]]:
         a = f"[{ACCENT}]"
@@ -87,8 +194,6 @@ class EditMenu(_Menu):
             ("theme", f"{a}▩[/]  load a template (replace all)"),
             ("rewizard", f"{a}◇[/]  full re-wizard"),
             ("preview", f"{a}▣[/]  preview current"),
-            ("doctor", f"{a}◈[/]  doctor"),
-            ("reset", f"{a}▚[/]  reset"),
         ]
 
     def handle(self, key: str) -> None:
@@ -108,10 +213,6 @@ class EditMenu(_Menu):
             self.app.push_screen(ThemeGallery())
         elif key == "preview":
             self.app.push_screen(PreviewScreen())
-        elif key == "doctor":
-            self.app.push_screen(DoctorScreen())
-        elif key == "reset":
-            self.app.push_screen(ResetScreen())
 
 
 class PreviewScreen(Screen):
@@ -154,39 +255,6 @@ class DoctorScreen(Screen):
         lines.append(f"{mark(detect.get_welcome_zsh_path().exists())} welcome.zsh exists")
         lines.append(f"{mark(detect.get_welcome_banner_path().exists())} welcome_banner.py exists")
         zshrc = detect.get_zshrc()
-        injected = zshrc.exists() and "# >>> welchost >>>" in zshrc.read_text()
+        injected = zshrc.exists() and SENTINEL_START in zshrc.read_text()
         lines.append(f"{mark(injected)} .zshrc sentinel present")
         return "\n".join(lines)
-
-
-class ResetScreen(Screen):
-    """Confirm and perform a reset."""
-
-    BINDINGS = [
-        ("escape", "app.pop_screen", "Cancel"),
-        ("y", "do_reset", "Confirm reset"),
-        ("n", "app.pop_screen", "Cancel"),
-    ]
-
-    def compose(self) -> ComposeResult:
-        target = (
-            "the dev-home sandbox" if detect.is_dev() else "all welchost files and the .zshrc block"
-        )
-        with Center():
-            yield Static(
-                f"This will remove [bold]{target}[/bold].\n\n"
-                "Press [bold]y[/bold] to confirm, [bold]n[/bold]/esc to cancel.",
-                id="reset-confirm",
-            )
-        yield Footer()
-
-    def action_do_reset(self) -> None:
-        from ...generator import reset as do_reset
-
-        removed = do_reset()
-        msg = (
-            "Removed:\n" + "\n".join(f"  • {p}" for p in removed)
-            if removed
-            else "Nothing to remove."
-        )
-        self.query_one("#reset-confirm", Static).update(msg)

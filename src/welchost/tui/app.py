@@ -50,9 +50,35 @@ class WelchostApp(App):
         else:
             self.push_screen(MainMenu())
 
+    # --- config lifecycle ----------------------------------------------------
+    # `model` is the working config; `had_config` tracks whether a config exists
+    # on disk. These three helpers are the only places that mutate that pair, so
+    # the state stays consistent across save / delete / new-build flows.
+
+    def adopt_config(self, model: WelchostConfig) -> None:
+        """Record `model` as the now-installed config (call after a save)."""
+        self.model = model
+        self.had_config = True
+
+    def clear_config(self) -> None:
+        """Reset to defaults with nothing installed (call after delete/reset)."""
+        self.model = WelchostConfig.default()
+        self.had_config = False
+
+    def new_draft(self) -> None:
+        """Start a fresh in-memory config for a new build. The on-disk files are
+        untouched until the user saves, so `had_config` is intentionally left as
+        is rather than flipped — it reflects disk, not the editor."""
+        self.model = WelchostConfig.default()
+
     def refresh_preview(self) -> None:
-        """Re-render every mounted BannerPreview from the current model."""
-        for preview in self.query(BannerPreview):
+        """Re-render every mounted BannerPreview from the current model.
+
+        Queries the active screen, not the app: in Textual 8.x ``App.query``
+        does not descend into the current screen's tree, so ``self.query`` here
+        would match nothing and the preview would never render.
+        """
+        for preview in self.screen.query(BannerPreview):
             preview.show(self.model)
 
 

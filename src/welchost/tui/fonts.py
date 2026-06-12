@@ -38,10 +38,14 @@ def all_fonts() -> list[str]:
     return sorted(FigletFont.getFonts())
 
 
-def search_fonts(query: str, limit: int = 60) -> list[str]:
-    """Curated first when query is empty, else a filtered match over all fonts."""
-    query = (query or "").strip().lower()
-    if not query:
-        return CURATED
-    matches = [f for f in all_fonts() if query in f.lower()]
-    return matches[:limit]
+@lru_cache(maxsize=1)
+def font_options() -> list[tuple[str, str]]:
+    """(label, value) pairs for the font dropdown: curated first, then the rest.
+
+    Every pyfiglet font is included so nothing is lost vs. the old search; the
+    Select's built-in type-to-jump replaces the separate search box. De-duped so
+    a curated font never appears twice.
+    """
+    seen = set(CURATED)
+    ordered = [*CURATED, *(f for f in all_fonts() if f not in seen)]
+    return [(name, name) for name in ordered]

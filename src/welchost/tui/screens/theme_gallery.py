@@ -7,7 +7,7 @@ highlighted template in the wizard (where text/font/etc. are editable).
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import Center, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, Label, ListItem, ListView, Static
 
@@ -21,15 +21,18 @@ class TemplateList(Screen):
     BINDINGS = [("escape", "app.pop_screen", "Back")]
 
     CSS = """
-    TemplateList #picker { width: 72; max-width: 100%; padding: 1 2; }
-    TemplateList #tpl { height: auto; max-height: 12; border: round $panel; margin: 1 0; }
+    TemplateList #picker { width: 100%; height: 1fr; }
+    /* List on the left, live preview on the right, each scrolls on its own. */
+    TemplateList #list-col { width: 56; max-width: 60%; padding: 1 2; height: 1fr; }
+    TemplateList #preview-col { width: 1fr; padding: 1 2; height: 1fr; border-left: round $panel; }
+    TemplateList #tpl { height: auto; border: round $panel; margin: 1 0; }
     TemplateList ListItem { padding: 0 1; }
     TemplateList BannerPreview { margin: 1 0 0 0; }
     """
 
     def compose(self) -> ComposeResult:
-        with Center():
-            with Vertical(id="picker"):
+        with Horizontal(id="picker"):
+            with Vertical(id="list-col"):
                 yield Static("~/welchost ❯ pick a template", classes="section-label")
                 yield ListView(
                     *[
@@ -38,9 +41,10 @@ class TemplateList(Screen):
                     ],
                     id="tpl",
                 )
+                yield Static("↑/↓ browse · enter customize · esc back", classes="hint")
+            with VerticalScroll(id="preview-col"):
                 yield Static("live preview", classes="panel-title")
                 yield BannerPreview()
-                yield Static("↑/↓ browse · enter customize · esc back", classes="hint")
         yield Footer()
 
     def on_mount(self) -> None:
