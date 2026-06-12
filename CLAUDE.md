@@ -206,8 +206,10 @@ welchost              → full interactive TUI (alias of `welchost config`)
 welchost config       → TUI: create wizard if no config, edit menu if config exists
 welchost preview      → render current banner to stdout (no TUI, no file changes)
 welchost reset        → remove all welchost files + .zshrc injection (confirms first)
-welchost doctor       → check Ghostty installed, TERM_PROGRAM, chain validity
 welchost version      → print version
+
+welchost doctor       → [DEV ONLY] Ghostty/env/chain diagnostics. Hidden from
+                        `--help` and refuses to run outside dev mode.
 ```
 
 Global flag (root callback): `--dev` sets `detect.DEV_MODE = True` **before** any
@@ -215,10 +217,13 @@ subcommand runs. `WELCHOST_DEV=1` env var is equivalent. The TUI entry point is 
 lazy import; if Textual isn't importable for some reason the core commands must
 still work.
 
-`preview` and `doctor` read the existing `welchost.toml`. If none exists,
-`preview` should render a sensible default and say so; `doctor` reports the
-missing config as a finding, not a crash. All user-facing output goes through a
-Rich `Console` — **never bare `print()`**.
+`preview` reads the existing `welchost.toml`; if none exists it renders a
+sensible default and says so. `doctor` is a **development-only diagnostic**:
+hidden from the user-facing CLI *and* the TUI menus, and it refuses to run
+outside dev mode (`--dev` / `WELCHOST_DEV=1`), exiting non-zero with a message.
+In dev it reports each chain link (Ghostty, env, files, sentinel) as a finding,
+not a crash. All user-facing output goes through a Rich `Console` — **never bare
+`print()`**.
 
 ---
 
@@ -242,7 +247,7 @@ welchost
 - ── separator ──
 - 👁  preview current  *(only if config exists)*
 - ✏️  edit existing  *(only if config exists)*
-- 🔧 doctor
+- 🔧 doctor  *(dev mode only — hidden from normal users)*
 - 💀 reset
 
 **Theme gallery:** 3-column grid of cards; each card shows a mini pyfiglet

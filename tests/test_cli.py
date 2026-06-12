@@ -20,8 +20,14 @@ def test_version():
 def test_help_lists_commands():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    for cmd in ("config", "preview", "reset", "doctor", "version"):
+    for cmd in ("config", "preview", "reset", "version"):
         assert cmd in result.stdout
+
+
+def test_doctor_hidden_from_user_help():
+    """doctor is a dev-only diagnostic and must not appear in the public CLI."""
+    result = runner.invoke(app, ["--help"])
+    assert "doctor" not in result.stdout
 
 
 def test_preview_without_config(fake_home):
@@ -46,6 +52,13 @@ def test_doctor_runs(fake_home):
     result = runner.invoke(app, ["--dev", "doctor"])
     assert result.exit_code == 0
     assert "doctor" in result.stdout.lower()
+
+
+def test_doctor_blocked_without_dev(fake_home):
+    """A normal user invoking doctor is refused, not given diagnostics."""
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code != 0
+    assert "development-only" in result.stdout
 
 
 def test_reset_aborts_on_no(fake_home):
