@@ -52,6 +52,7 @@ Issues = "https://github.com/scoobynko/welchost/issues"
 [project.scripts]
 welchost = "welchost.cli:app"
 
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/welchost"]
 
