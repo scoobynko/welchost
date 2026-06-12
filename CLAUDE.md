@@ -106,6 +106,10 @@ welchost/
   `version`. Root callback handles the global `--dev` flag. Importing the TUI is
   deferred (lazy import inside the command) so non-TUI commands stay fast and the
   core has no dependency on Textual.
+- **update.py** — Self-update support (core, no Textual). Checks PyPI for a newer
+  release (`latest_version`, fails soft to `None` when offline), compares versions,
+  detects the install method (brew/pipx/pip), and resolves/runs the upgrade command.
+  On launch the TUI checks in a background thread and, if newer, prompts to update.
 - **tui/** — Textual UI. **Depends on core, never the reverse.** Core modules must
   never `import` from `welchost.tui`.
 
