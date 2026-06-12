@@ -10,7 +10,10 @@ concurrency:
 jobs:
   release:
     name: Release
-    runs-on: macos-latest
+    # Must be Linux: python-semantic-release is a Docker container action, which
+    # only runs on Linux runners. Wheel build + PyPI publish are platform-agnostic;
+    # the macOS-only `brew install` check lives in homebrew-test.yml.
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       id-token: write
