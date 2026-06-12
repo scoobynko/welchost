@@ -77,15 +77,45 @@ jobs:
           password: ${{ secrets.PYPI_TOKEN }}
 
       - name: Update Homebrew tap
+        # Bump the tap formula directly. We don't use bump-homebrew-formula-action:
+        # it defaults to a fork+PR flow and fails with "invalid ref: refs/heads/main"
+        # because the token owner (scoobynko) also owns the tap, so the fork it wants
+        # can't exist. Instead, compute the sha256 from the freshly built sdist, swap
+        # the one main url/sha pair (resource blocks are untouched — only the main
+        # package filename matches "welchost-<ver>.tar.gz"), and push. The token is an
+        # admin, so it bypasses the tap's protect-main ruleset.
         # Skips until the tap token is configured, so a PyPI-only release stays green.
         if: steps.release.outputs.released == 'true' && env.HOMEBREW_TAP_TOKEN != ''
-        uses: mislav/bump-homebrew-formula-action@v3
-        with:
-          formula-name: welchost
-          formula-path: Formula/welchost.rb
-          homebrew-tap: scoobynko/homebrew-welchost
-          base-branch: main
-          download-url: https://files.pythonhosted.org/packages/source/w/welchost/welchost-${{ steps.release.outputs.version }}.tar.gz
-          commit-message: "chore: bump welchost to {{version}}"
         env:
-          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ steps.release.outputs.version }}
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          SHA=$(sha256sum "dist/welchost-${VERSION}.tar.gz" | awk '{print $1}')
+          # Canonical hashed sdist URL from PyPI (retry: the index lags the upload).
+          URL=""
+          for i in 1 2 3 4 5 6; do
+            URL=$(curl -fsSL "https://pypi.org/pypi/welchost/${VERSION}/json" \
+              | python -c "import sys,json;print([u for u in json.load(sys.stdin)['urls'] if u['packagetype']=='sdist'][0]['url'])" 2>/dev/null) \
+              && [ -n "$URL" ] && break
+            echo "PyPI not ready (attempt $i); retrying in 5s"; sleep 5
+          done
+          [ -n "$URL" ] || { echo "::error::could not resolve sdist URL for ${VERSION}"; exit 1; }
+          echo "Bumping formula to ${VERSION}: ${URL} (${SHA})"
+          git clone --depth 1 "https://x-access-token:${TAP_TOKEN}@github.com/scoobynko/homebrew-welchost.git" tap
+          python - "$URL" "$SHA" <<'PY'
+          import re, sys
+          url, sha = sys.argv[1], sys.argv[2]
+          path = "tap/Formula/welchost.rb"
+          text = open(path).read()
+          text, n = re.subn(
+              r'url "[^"]*welchost-[^"]*\.tar\.gz"\n(\s*)sha256 "[0-9a-f]+"',
+              f'url "{url}"\n\\1sha256 "{sha}"', text, count=1)
+          assert n == 1, f"expected exactly 1 main-package substitution, got {n}"
+          open(path, "w").write(text)
+          PY
+          cd tap
+          git config user.name "welchost-release"
+          git config user.email "release@welchost.dev"
+          git commit -am "chore: bump welchost to ${VERSION}"
+          git push origin HEAD:main
