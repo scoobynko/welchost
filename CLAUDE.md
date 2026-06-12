@@ -38,7 +38,7 @@ The `.zshrc` line is always gated so the banner only runs in an interactive
 Ghostty shell:
 
 ```zsh
-[[ "$TERM_PROGRAM" == "ghostty" && $- == *i* ]] && source ~/.config/ghostty/welcome.zsh
+[[ "$TERM_PROGRAM" == "ghostty" && $- == *i* && -r ~/.config/ghostty/welcome.zsh ]] && source ~/.config/ghostty/welcome.zsh
 ```
 
 ---
@@ -62,7 +62,8 @@ welchost/
 │   ├── config.py            # WelchostConfig dataclass + load/save welchost.toml
 │   ├── detect.py            # Ghostty + env detection + DEV-mode path resolution
 │   ├── generator.py         # render templates + .zshrc sentinel inject/remove
-│   ├── themes.py            # the 12 built-in themes registry
+│   ├── themes.py            # the 6 built-in templates registry
+│   ├── ornaments.py         # predefined flanking ASCII ornaments (plain data)
 │   ├── tui/
 │   │   ├── app.py            # Textual App entry point (WelchostApp)
 │   │   ├── dev_watcher.py    # watchdog hot-reload (DEV mode only)
@@ -145,7 +146,7 @@ DEV mode). It is the **single source of truth**. `welcome.zsh` and
 [banner]
 text = "Welcome"
 font = "slant"
-size = "auto"          # auto | sm | md | lg | xl
+align = "left"         # left | center | right  (position on screen)
 color_mode = "solid"   # solid | gradient
 
 [color.solid]
@@ -154,16 +155,20 @@ value = "cyan"         # Rich color name OR hex "#rrggbb"
 [color.gradient]
 start = "cyan"
 end = "magenta"
+direction = "horizontal"   # horizontal | vertical | diagonal
 
 [decoration]
-border_style = "panel"   # panel | box | double | rounded | ascii | none
+border_style = "none"    # panel | box | double | rounded | ascii | none  (default: none)
 border_color = "magenta"
+
+[ornament]
+name = "none"            # none | ghosts | stars | bars | dots  (flanks the banner)
 
 [info]
 show_user = true
-show_host = true
-show_os = true
 show_datetime = true
+show_host = false
+show_os = false
 show_uptime = false
 show_shell = false
 show_python = false
@@ -176,10 +181,16 @@ created_at = ""          # ISO8601 timestamp set on first save
 
 ### Valid values
 
-- `banner.size`: `auto | sm | md | lg | xl`
+- `banner.align`: `left | center | right` (position of the banner across the terminal width)
 - `banner.color_mode`: `solid | gradient`
+- `color.gradient.direction`: `horizontal | vertical | diagonal`
 - `decoration.border_style`: `panel | box | double | rounded | ascii | none`
+- `ornament.name`: `none | ghosts | stars | bars | dots` (predefined ASCII blocks
+  flanking the banner; see `welchost/ornaments.py`)
 - Colors: any Rich color name (`cyan`, `bright_green`, `magenta`, …) or `#rrggbb`.
+- `info.*`: all eight flags exist in the schema, but only `show_user` and
+  `show_datetime` default on and are exposed in the wizard; the rest are for TOML
+  power users.
 
 `WelchostConfig` is a dataclass that mirrors this structure (nested dataclasses
 or flat fields — implementer's choice, but round-trip through TOML must be
@@ -239,9 +250,12 @@ preview in that theme's font/color. `enter` = use as-is → confirm. `c` =
 customize → wizard pre-populated. `/` or typing = search filter.
 
 **Wizard (4 steps, each with a live preview pane at the bottom):**
-1. **text + font + size** — text input, font picker (curated 20, all 428 via `/` search), size.
-2. **color** — mode (solid | gradient), swatch row, free hex input.
-3. **decoration + info** — border style, border color, info-widget toggles.
+1. **text + font + alignment** — text input, font picker (dropdown Select, curated first + all fonts), screen alignment (left/center/right).
+2. **color** — mode (solid | gradient); a `ColorField` dropdown of named preset
+   colors (each with a swatch) + custom hex; for gradient, start/end fields plus
+   a direction picker (horizontal | vertical | diagonal).
+3. **decoration + info** — border style, border color, ornament (flanking ASCII),
+   and the two info-widget toggles (user, date/time).
 4. **confirm** — full preview + file diff summary + **save & install**.
 
 **Edit menu (config exists):** text & font → step 1 pre-filled; color → step 2;
@@ -310,27 +324,28 @@ is ever missing, so a bad font name can never crash generation or install.
 
 ## 8. Gradient rendering
 
-Gradient is per-character via Rich `Color.blend()`. This exact pattern is used in
-both the TUI preview and the generated `welcome_banner.py`:
+Gradient is per-character RGB interpolation between `gradient.start` and
+`gradient.end`. Each character's blend factor `f ∈ [0, 1]` comes from its
+position in the **whole art block**, per `gradient.direction`:
+
+- `horizontal` — `f = col / (maxwidth - 1)` (left→right across each line; the default).
+- `vertical` — `f = row / (rows - 1)` (top→bottom; each line is one solid blend).
+- `diagonal` — `f = (col/(maxwidth-1) + row/(rows-1)) / 2` (top-left→bottom-right).
 
 ```python
-from rich.color import Color
-from rich.text import Text
-
-def render_gradient(text: str, start_hex: str, end_hex: str) -> Text:
-    start = Color.from_rgb(*bytes.fromhex(start_hex.lstrip("#")))
-    end   = Color.from_rgb(*bytes.fromhex(end_hex.lstrip("#")))
-    n = max(len(text) - 1, 1)
-    t = Text()
-    for i, ch in enumerate(text):
-        r = i / n
-        blended = start.blend(end, r)  # type: ignore
-        t.append(ch, style=f"bold {blended}")
-    return t
+def factor(col, row, dx, dy, direction):  # dx = maxwidth-1, dy = rows-1
+    if direction == "vertical":
+        return row / dy
+    if direction == "diagonal":
+        return (col / dx + row / dy) / 2
+    return col / dx  # horizontal
 ```
 
-Apply it to **every line** of the pyfiglet output (the gradient runs left→right
-across each line). Solid mode just applies one style to the whole block.
+This identical logic lives in both the TUI/CLI preview (`render.py`,
+`render_art` → `_gradient_factor`) and the generated `welcome_banner.py`
+(`colorize_line` → `_factor`), so the preview is WYSIWYG. The dimensions
+(`maxwidth`, `rows`) are taken from the art block only — info lines stay plain.
+Solid mode just applies one style to the whole block.
 
 ---
 
@@ -340,7 +355,7 @@ Always use sentinel markers, never double-inject, always back up first.
 
 ```zsh
 # >>> welchost >>>
-[[ "$TERM_PROGRAM" == "ghostty" && $- == *i* ]] && source ~/.config/ghostty/welcome.zsh
+[[ "$TERM_PROGRAM" == "ghostty" && $- == *i* && -r ~/.config/ghostty/welcome.zsh ]] && source ~/.config/ghostty/welcome.zsh
 # <<< welchost <<<
 ```
 
@@ -372,10 +387,12 @@ python3 "${HOME}/.config/ghostty/welcome_banner.py"
 
 A standalone Python script (depends only on Rich, which the user has via the
 installed welchost venv — or guard the import) that:
-- Builds the pyfiglet text from `banner.text` / `banner.font` / `banner.size`.
+- Builds the pyfiglet text from `banner.text` / `banner.font` (native size).
 - Applies solid color or per-character gradient (the `render_gradient` pattern).
 - Wraps in the chosen border (`panel`/`box`/`double`/`rounded`/`ascii`/`none`)
   via a Rich `Panel` (or plain for `none`).
+- Positions the whole block across the terminal width per `banner.align`
+  (`left`/`center`/`right`).
 - Appends the enabled info lines (`show_user`, `show_host`, `show_os`,
   `show_datetime`, `show_uptime`, `show_shell`, `show_python`, `show_ip`).
 - Prints to stdout via a Rich `Console`.
