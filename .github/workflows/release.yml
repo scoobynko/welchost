@@ -56,6 +56,8 @@ jobs:
           # ruleset. GH_TOKEN is still used for the GitHub Release API.
           git config user.name "Welchost Contributors"
           git config user.email "noreply@welchost.dev"
+          echo "Push remote (must be SSH for the deploy-key bypass):"
+          git remote -v
           prev="$(git describe --tags --abbrev=0 2>/dev/null || echo none)"
           semantic-release -v version
           curr="$(git describe --tags --abbrev=0 2>/dev/null || echo none)"

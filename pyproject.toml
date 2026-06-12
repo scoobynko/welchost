@@ -80,6 +80,13 @@ upload_to_pypi = false
 upload_to_release = true
 tag_format = "v{version}"
 
+[tool.semantic_release.remote]
+# Push the version bump over the plain (SSH) remote that actions/checkout
+# configured from RELEASE_SSH_KEY, instead of an https://<GH_TOKEN>@github URL.
+# The SSH deploy key is a bypass actor on the protected-main ruleset; the token
+# (github-actions[bot]) is not, so token pushes are rejected with GH013.
+ignore_token_for_push = true
+
 [tool.semantic_release.commit_parser_options]
 allowed_tags = ["feat", "fix", "chore", "docs", "test", "refactor", "perf", "ci"]
 minor_tags = ["feat"]
