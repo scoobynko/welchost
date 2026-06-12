@@ -1,0 +1,20 @@
+extends:
+  - conventional
+rules:
+  type-enum:
+    - 2
+    - always
+    - [feat, fix, chore, docs, test, refactor, perf, ci, build]
+  scope-empty:
+    - 0
+  subject-empty:
+    - 2
+    - never
+  subject-max-length:
+    - 2
+    - always
+    - 100
+  header-max-length:
+    - 2
+    - always
+    - 120

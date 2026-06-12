@@ -1,0 +1,46 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  commit-lint:
+    name: Validate commit messages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@v6
+        with:
+          configFile: .commitlintrc.yml
+          failOnWarnings: false
+          helpURL: "https://www.conventionalcommits.org"
+
+  changeset-check:
+    name: Check release notes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Check conventional commit on PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          python -c "
+          import re, os, sys
+          title = os.environ['PR_TITLE']
+          pattern = r'^(feat|fix|chore|docs|test|refactor|perf|ci|build)(\(.+\))?!?: .{1,100}$'
+          if not re.match(pattern, title):
+              print(f'PR title does not follow conventional commits: {title}')
+              print('Expected: type(scope): description')
+              print('Example:  feat(tui): add gradient preview')
+              sys.exit(1)
+          print(f'PR title OK: {title}')
+          "
