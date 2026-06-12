@@ -101,12 +101,15 @@ class MainMenu(_Menu):
 
     def items(self) -> list[tuple[str, str]]:
         a = f"[{ACCENT}]"
-        return [
+        rows = [
             ("themes", f"{a}▦[/]  browse templates   [dim]fast[/dim]"),
             ("custom", f"{a}◧[/]  build custom screen [dim]full control[/dim]"),
-            ("doctor", f"{a}◈[/]  doctor"),
-            ("reset", f"{a}▩[/]  reset"),
         ]
+        # doctor is a dev-only diagnostic — hidden from normal users.
+        if detect.is_dev():
+            rows.append(("doctor", f"{a}◈[/]  doctor [dim]dev[/dim]"))
+        rows.append(("reset", f"{a}▩[/]  reset"))
+        return rows
 
     def handle(self, key: str) -> None:
         if key == "themes":
@@ -143,13 +146,16 @@ class EditMenu(_Menu):
 
     def items(self) -> list[tuple[str, str]]:
         a = f"[{ACCENT}]"
-        return [
+        rows = [
             ("edit", f"{a}▸[/]  edit current"),
             ("new", f"{a}▸[/]  create new  [dim](replaces current)[/dim]"),
             ("preview", f"{a}▸[/]  preview current"),
-            ("doctor", f"{a}▸[/]  doctor"),
-            ("delete", f"{a}▸[/]  delete welcome screen"),
         ]
+        # doctor is a dev-only diagnostic — hidden from normal users.
+        if detect.is_dev():
+            rows.append(("doctor", f"{a}▸[/]  doctor [dim]dev[/dim]"))
+        rows.append(("delete", f"{a}▸[/]  delete welcome screen"))
+        return rows
 
     def handle(self, key: str) -> None:
         if key == "edit":

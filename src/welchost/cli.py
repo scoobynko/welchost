@@ -94,9 +94,20 @@ def reset(
         console.print("[dim]Nothing to remove.[/dim]")
 
 
-@app.command()
+@app.command(hidden=True)
 def doctor() -> None:
-    """Check Ghostty install, environment, and the install chain."""
+    """[dev only] Diagnostics: Ghostty install, env, and the install chain.
+
+    Hidden from the user-facing CLI and refuses to run outside dev mode
+    (``--dev`` or ``WELCHOST_DEV=1``). It's a debugging aid, not a user command.
+    """
+    if not detect.is_dev():
+        console.print(
+            "[red]welchost doctor[/red] is a development-only diagnostic. "
+            "Re-run with [bold]--dev[/bold] or set [bold]WELCHOST_DEV=1[/bold]."
+        )
+        raise typer.Exit(2)
+
     from rich.table import Table
 
     table = Table(title="welchost doctor", show_header=True, header_style="bold")
@@ -108,8 +119,7 @@ def doctor() -> None:
         mark = "[green]✓[/green]" if ok else "[red]✗[/red]"
         table.add_row(name, mark, detail)
 
-    if detect.is_dev():
-        console.print("[yellow]DEV mode[/yellow] — sandboxed at ./dev-home/")
+    console.print("[yellow]DEV mode[/yellow] — sandboxed at ./dev-home/")
 
     row(
         "Ghostty installed",

@@ -34,7 +34,6 @@ pipx install welchost
 welchost            # launch the interactive TUI (themes + custom wizard)
 welchost config     # same as above
 welchost preview    # render the current banner to stdout
-welchost doctor     # check Ghostty, env, and the install chain
 welchost reset      # remove all welchost files and the .zshrc injection
 welchost version    # print version
 ```
@@ -87,7 +86,11 @@ skips the Ghostty check, and enables hot-reload of the TUI.
 ```bash
 welchost --dev            # sandboxed TUI
 welchost --dev reset      # wipes ./dev-home/ only
+welchost --dev doctor     # diagnostics: Ghostty, env, and install-chain health
 ```
+
+`doctor` is a **development-only** diagnostic: it's hidden from the user-facing
+CLI and refuses to run outside `--dev` / `WELCHOST_DEV=1`.
 
 ## Test & lint
 
