@@ -250,42 +250,58 @@ save / discard.
 
 ### Live preview requirement
 
-Every screen has a `BannerPreview` widget that re-renders within ~100ms of any
-input change, using Textual's reactive system (watch methods on reactive attrs).
-The preview renders the same way `welcome_banner.py` will, so what you see is
-what you get.
+Every screen has a `BannerPreview` widget (uses a `render()` override, not
+`update()` — Textual 8.x measures auto-height widgets via the render path) that
+re-renders on any input change. It renders the same way `welcome_banner.py` will,
+so what you see is what you get.
+
+### Keyboard-only navigation (no mouse required)
+
+- First screen shows the `Logo` splash (compact `pagga` wordmark + ghost +
+  `~/welchost ❯` prompt + tagline).
+- Menus: `ListView`, focused on mount, `↑/↓` + `enter`.
+- Theme gallery: a grid of focusable `ThemeCard`s; `↑↓←→` **and** `hjkl` move
+  focus, `enter` = use → confirm, `c` = customize → wizard, `/` = search, `esc`
+  = back (or defocus search).
+- Wizard: step content is Tab-navigable; **`ctrl+←` / `ctrl+→`** change steps
+  (plain arrows are left to text inputs), `ctrl+s` saves & installs from
+  anywhere. Each step auto-focuses its first control. Color presets and mode are
+  `RadioSet`s (no click-only buttons).
 
 ---
 
-## 7. The 12 themes
+## 7. The 6 templates
+
+Curated down to a focused set (the original 12 had two invalid pyfiglet font
+names — `3d-diagonal`/`calgames` — and were too many). Filled / block fonts
+lead, matching the Claude / Codex CLI aesthetic. Brand accent is terracotta
+`#d97757` (matches jakubsalmik.com).
 
 | name | font | banner color | border color | border style |
 |---|---|---|---|---|
+| claude | ansi_shadow | #d97757 (terracotta) | #d97757 | rounded |
+| codex | ansi_regular | white | cyan | box |
 | ghost | slant | cyan | magenta | panel |
-| hacker | doom | green | green | box |
-| dracula | standard | #cba6f7 | #f38ba8 | rounded |
-| catppuccin | big | #cba6f7 | #89dceb | panel |
-| nord | thin | #88c0d0 | #8fbcbb | panel |
-| gruvbox | banner | #fe8019 | #fabd2f | box |
-| tokyo-night | nancyj | #bb9af7 | #7aa2f7 | panel |
-| monochrome | larry3d | white | white | double |
-| hot | epic | red | yellow | box |
-| ocean | univers | #0099ff | #00ccff | rounded |
-| matrix | banner | bright_green | green | none |
+| matrix | ansi_regular | bright_green | green | none |
 | sunset | slant | gradient #ff6b35 → #f7c59f | #ff6b35 | panel |
+| mono | pagga | white | — | none |
 
-`sunset` uses `color_mode = "gradient"` (start `#ff6b35`, end `#f7c59f`); all
-others are `solid`. Each theme maps to a full `WelchostConfig`. Every font name
-above must be a valid pyfiglet font (verified by `tests/test_themes.py`).
+`sunset` uses `color_mode = "gradient"`; all others are `solid`. Each template
+maps to a full `WelchostConfig` and carries a short `blurb`. Every font name must
+be a valid pyfiglet font (verified by `tests/test_themes.py`), and the whole
+curated font list is validated by `tests/test_generator.py`.
 
 ### Curated font shortlist (for the wizard picker)
 
+Filled first, then classics — all verified valid:
+
 ```
-slant, doom, big, banner, standard, isometric1, 3d-diagonal, alligator2,
-epic, univers, shadow, puffy, graffiti, larry3d, calgames, contessa,
-straight, thin, bulbhead, nancyj
+ansi_shadow, ansi_regular, pagga, block, banner3, colossal, slant, doom, big,
+standard, isometric1, 3d_diagonal, epic, univers, shadow, larry3d, straight,
+thin, bulbhead, nancyj
 ```
-Plus all 428 via `/` search.
+Plus all 571 via `/` search. `build_figlet()` falls back to `standard` if a font
+is ever missing, so a bad font name can never crash generation or install.
 
 ---
 

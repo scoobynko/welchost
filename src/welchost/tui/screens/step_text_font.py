@@ -21,12 +21,12 @@ class StepTextFont(Vertical):
         self._fonts: list[str] = []
 
     def compose(self) -> ComposeResult:
-        yield Label("Banner text")
+        yield Label("banner text", classes="section-label")
         yield Input(placeholder="Welcome", id="text")
-        yield Label("Font  (type to search 571 fonts; blank = curated)")
+        yield Label("font  (type to search; blank = curated)", classes="section-label")
         yield Input(placeholder="search fonts…", id="font_search")
         yield ListView(id="font_list")
-        yield Label("Size")
+        yield Label("size", classes="section-label")
         yield Select([(s, s) for s in SIZES], id="size", allow_blank=False)
 
     def load_from_model(self) -> None:

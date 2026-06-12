@@ -4,24 +4,25 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-# The curated shortlist surfaced first in the picker.
+# Curated shortlist surfaced first in the picker. Filled / block fonts lead
+# (Claude / Codex CLI vibe), then a few clean classics. All verified valid.
 CURATED = [
+    "ansi_shadow",
+    "ansi_regular",
+    "pagga",
+    "block",
+    "banner3",
+    "colossal",
     "slant",
     "doom",
     "big",
-    "banner",
     "standard",
     "isometric1",
-    "3d-diagonal",
-    "alligator2",
+    "3d_diagonal",
     "epic",
     "univers",
     "shadow",
-    "puffy",
-    "graffiti",
     "larry3d",
-    "calgames",
-    "contessa",
     "straight",
     "thin",
     "bulbhead",

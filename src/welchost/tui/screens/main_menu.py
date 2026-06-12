@@ -5,24 +5,28 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.containers import Center, Vertical
 from textual.screen import Screen
-from textual.widgets import Footer, Header, Label, ListItem, ListView, Static
+from textual.widget import Widget
+from textual.widgets import Footer, Label, ListItem, ListView, Static
 
 from ... import detect
+from ..logo import Logo
 
 
 class _Menu(Screen):
-    """Base list-driven menu screen."""
+    """Base list-driven menu screen. Fully keyboard-driven."""
 
     BINDINGS = [("escape", "app.pop_screen", "Back")]
 
     def items(self) -> list[tuple[str, str]]:  # (id, label)
         raise NotImplementedError
 
+    def header_widget(self) -> Widget:
+        return Logo()
+
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=False)
         with Center():
             with Vertical(id="menu-box"):
-                yield Static(self.banner_line(), classes="panel-title")
+                yield self.header_widget()
                 yield ListView(
                     *[ListItem(Label(label), id=key) for key, label in self.items()],
                     id="menu",
@@ -30,8 +34,8 @@ class _Menu(Screen):
                 yield Static("↑/↓ move · enter select · q quit", classes="hint")
         yield Footer()
 
-    def banner_line(self) -> str:
-        return "💀 welchost"
+    def on_mount(self) -> None:
+        self.query_one("#menu", ListView).focus()
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         self.handle(event.item.id or "")
@@ -68,6 +72,9 @@ class MainMenu(_Menu):
 
 class EditMenu(_Menu):
     """Shown when a config already exists."""
+
+    def header_widget(self) -> Widget:
+        return Static("~/welchost ❯ edit", classes="section-label")
 
     def items(self) -> list[tuple[str, str]]:
         return [
@@ -112,7 +119,7 @@ class PreviewScreen(Screen):
     def compose(self) -> ComposeResult:
         from ..widgets import BannerPreview
 
-        yield Header(show_clock=False)
+        yield Static("~/welchost ❯ preview", classes="section-label")
         with Center():
             yield BannerPreview()
         yield Footer()
@@ -127,7 +134,6 @@ class DoctorScreen(Screen):
     BINDINGS = [("escape", "app.pop_screen", "Back")]
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=False)
         with Center():
             yield Static(self._report(), id="doctor-report")
         yield Footer()
@@ -163,7 +169,6 @@ class ResetScreen(Screen):
         target = (
             "the dev-home sandbox" if detect.is_dev() else "all welchost files and the .zshrc block"
         )
-        yield Header(show_clock=False)
         with Center():
             yield Static(
                 f"This will remove [bold]{target}[/bold].\n\n"
