@@ -9,6 +9,7 @@ from textual.widget import Widget
 from textual.widgets import Footer, Label, ListItem, ListView, Static
 
 from ... import detect
+from ...themes import ACCENT
 from ..logo import Logo
 
 
@@ -48,11 +49,12 @@ class MainMenu(_Menu):
     """Shown when there is no existing config."""
 
     def items(self) -> list[tuple[str, str]]:
+        a = f"[{ACCENT}]"
         return [
-            ("themes", "🎨 browse themes  [fast]"),
-            ("custom", "⚙️  build custom screen  [full control]"),
-            ("doctor", "🔧 doctor"),
-            ("reset", "💀 reset"),
+            ("themes", f"{a}▦[/]  browse templates   [dim]fast[/dim]"),
+            ("custom", f"{a}◧[/]  build custom screen [dim]full control[/dim]"),
+            ("doctor", f"{a}◈[/]  doctor"),
+            ("reset", f"{a}▩[/]  reset"),
         ]
 
     def handle(self, key: str) -> None:
@@ -77,15 +79,16 @@ class EditMenu(_Menu):
         return Static("~/welchost ❯ edit", classes="section-label")
 
     def items(self) -> list[tuple[str, str]]:
+        a = f"[{ACCENT}]"
         return [
-            ("text", "✏️  text & font"),
-            ("color", "🎨 color"),
-            ("deco", "🔲 decoration & info"),
-            ("theme", "🌈 load a theme (replace all)"),
-            ("rewizard", "⚙️  full re-wizard"),
-            ("preview", "👁  preview current"),
-            ("doctor", "🔧 doctor"),
-            ("reset", "💀 reset"),
+            ("text", f"{a}▤[/]  text & font"),
+            ("color", f"{a}▦[/]  color"),
+            ("deco", f"{a}◧[/]  decoration & info"),
+            ("theme", f"{a}▩[/]  load a template (replace all)"),
+            ("rewizard", f"{a}◇[/]  full re-wizard"),
+            ("preview", f"{a}▣[/]  preview current"),
+            ("doctor", f"{a}◈[/]  doctor"),
+            ("reset", f"{a}▚[/]  reset"),
         ]
 
     def handle(self, key: str) -> None:

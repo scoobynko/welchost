@@ -257,12 +257,15 @@ so what you see is what you get.
 
 ### Keyboard-only navigation (no mouse required)
 
-- First screen shows the `Logo` splash (compact `pagga` wordmark + ghost +
-  `~/welchost ❯` prompt + tagline).
+- No emoji anywhere — pixel/block glyphs only. First screen shows the `Logo`
+  splash: a pixel-art ghost beside a `double_blocky` "welchost" wordmark, a
+  `~/welchost ❯` prompt, and the tagline. Menu items use accent block glyphs
+  (`▦ ◧ ◈ ▩ …`) as bullets.
 - Menus: `ListView`, focused on mount, `↑/↓` + `enter`.
-- Theme gallery: a grid of focusable `ThemeCard`s; `↑↓←→` **and** `hjkl` move
-  focus, `enter` = use → confirm, `c` = customize → wizard, `/` = search, `esc`
-  = back (or defocus search).
+- Template picker (`TemplateList`): a single `ListView` of templates with a live
+  `BannerPreview` below — `↑/↓` browses (preview updates live), `enter` opens the
+  wizard at step 1 (so text/font stay editable), `esc` back. A vertical list,
+  not a grid, so arrow nav is unambiguous.
 - Wizard: step content is Tab-navigable; **`ctrl+←` / `ctrl+→`** change steps
   (plain arrows are left to text inputs), `ctrl+s` saves & installs from
   anywhere. Each step auto-focuses its first control. Color presets and mode are
