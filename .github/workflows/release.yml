@@ -14,6 +14,9 @@ jobs:
     permissions:
       contents: write
       id-token: write
+    env:
+      # Surfaced at job level so steps can gate on its presence in `if:`.
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +50,8 @@ jobs:
           password: ${{ secrets.PYPI_TOKEN }}
 
       - name: Update Homebrew tap
-        if: steps.release.outputs.released == 'true'
+        # Skips until the tap token is configured, so a PyPI-only release stays green.
+        if: steps.release.outputs.released == 'true' && env.HOMEBREW_TAP_TOKEN != ''
         uses: mislav/bump-homebrew-formula-action@v3
         with:
           formula-name: welchost
