@@ -11,9 +11,9 @@ import typer
 from rich.console import Console
 
 from . import __version__, detect
-from .config import load_config
-from .generator import build_figlet, resolve_color
+from .config import WelchostConfig, load_config
 from .generator import reset as do_reset
+from .render import render_banner
 
 app = typer.Typer(
     name="welchost",
@@ -69,110 +69,8 @@ def preview() -> None:
             "[yellow]No config found.[/yellow] Showing the default banner. "
             "Run [bold]welchost config[/bold] to create one."
         )
-        from .config import WelchostConfig
-
         cfg = WelchostConfig.default()
-    _render_to_console(cfg)
-
-
-def _render_to_console(cfg) -> None:
-    """Render a banner using Rich (mirrors the generated welcome_banner.py)."""
-    from rich.align import Align
-    from rich.box import ASCII, DOUBLE, HEAVY, ROUNDED, SQUARE
-    from rich.panel import Panel
-    from rich.text import Text
-
-    art = build_figlet(cfg)
-    lines = art.splitlines()
-
-    block = Text()
-    for idx, line in enumerate(lines):
-        if cfg.banner.color_mode == "gradient":
-            block.append_text(_gradient_line(line, cfg.gradient.start, cfg.gradient.end))
-        else:
-            r, g, b = resolve_color(cfg.solid.value)
-            block.append(line, style=f"bold rgb({r},{g},{b})")
-        if idx != len(lines) - 1:
-            block.append("\n")
-
-    renderable: object = block
-    info = _info_text(cfg)
-    if info:
-        block.append("\n\n")
-        block.append_text(info)
-
-    style = cfg.decoration.border_style
-    if style == "none":
-        console.print(block)
-        return
-    box_map = {
-        "panel": HEAVY,
-        "box": SQUARE,
-        "double": DOUBLE,
-        "rounded": ROUNDED,
-        "ascii": ASCII,
-    }
-    br, bg, bb = resolve_color(cfg.decoration.border_color)
-    console.print(
-        Panel(
-            Align.left(renderable),
-            box=box_map.get(style, SQUARE),
-            border_style=f"rgb({br},{bg},{bb})",
-            expand=False,
-            padding=(0, 1),
-        )
-    )
-
-
-def _gradient_line(line: str, start: str, end: str):
-    from rich.text import Text
-
-    s = resolve_color(start)
-    e = resolve_color(end)
-    n = max(len(line) - 1, 1)
-    t = Text()
-    for i, ch in enumerate(line):
-        f = i / n
-        r = round(s[0] + (e[0] - s[0]) * f)
-        g = round(s[1] + (e[1] - s[1]) * f)
-        b = round(s[2] + (e[2] - s[2]) * f)
-        t.append(ch, style=f"bold rgb({r},{g},{b})")
-    return t
-
-
-def _info_text(cfg):
-    import getpass
-    import os
-    import platform
-    import socket
-    from datetime import datetime
-
-    from rich.text import Text
-
-    rows = []
-    i = cfg.info
-    if i.show_user:
-        rows.append(("user", getpass.getuser()))
-    if i.show_host:
-        rows.append(("host", socket.gethostname()))
-    if i.show_os:
-        mac = platform.mac_ver()[0]
-        rows.append(("os", f"macOS {mac}" if mac else platform.system()))
-    if i.show_datetime:
-        rows.append(("date", datetime.now().strftime("%a %d %b %Y · %H:%M")))
-    if i.show_shell:
-        rows.append(("shell", os.environ.get("SHELL", "?")))
-    if i.show_python:
-        rows.append(("python", platform.python_version()))
-    if not rows:
-        return None
-    t = Text()
-    for idx, (k, v) in enumerate(rows):
-        t.append(f"{k}: ", style="dim")
-        t.append(str(v))
-        if idx != len(rows) - 1:
-            t.append("\n")
-    return t
+    console.print(render_banner(cfg))
 
 
 @app.command()
