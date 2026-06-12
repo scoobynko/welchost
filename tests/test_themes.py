@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from pyfiglet import Figlet
 
+from welchost.ornaments import VALID_ORNAMENTS
 from welchost.themes import THEMES, all_themes, get_theme
 
 EXPECTED = {"claude", "codex", "ghost", "matrix", "sunset", "mono"}
@@ -20,6 +21,13 @@ def test_theme_font_is_valid_pyfiglet(theme):
     # Raises FontNotFound if the font name is invalid.
     fig = Figlet(font=theme.font)
     assert fig.renderText("Ab").strip()
+
+
+@pytest.mark.parametrize("theme", all_themes(), ids=lambda t: t.name)
+def test_theme_ornament_is_valid(theme):
+    # Mirrors the font-name check: an unknown ornament silently renders nothing
+    # (get_ornament falls back to empty), so a typo must fail the suite instead.
+    assert theme.ornament in VALID_ORNAMENTS
 
 
 @pytest.mark.parametrize("theme", all_themes(), ids=lambda t: t.name)

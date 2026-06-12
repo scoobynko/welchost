@@ -24,6 +24,28 @@ def test_generated_banner_is_self_contained(fake_home):
     assert "from rich" not in text
 
 
+def test_gradient_direction_baked_into_banner(fake_home):
+    cfg = WelchostConfig.default()
+    cfg.banner.color_mode = "gradient"
+    cfg.gradient.direction = "diagonal"
+    _, banner = generator.write_generated_files(cfg)
+    assert 'GRAD_DIR = "diagonal"' in banner.read_text()
+
+
+def test_ornament_baked_and_renders(fake_home):
+    cfg = WelchostConfig.default()
+    cfg.banner.text = "Hi"
+    cfg.ornament.name = "ghosts"
+    _, banner = generator.write_generated_files(cfg)
+    src = banner.read_text()
+    assert "ORN_LEFT = " in src
+    assert ")(" in src  # the ghost ornament glyphs are baked in
+    # the generated script must execute without error
+    ns = {"__name__": "not_main"}
+    exec(compile(src, "welcome_banner.py", "exec"), ns)
+    ns["render"]()
+
+
 def test_sentinel_idempotent(fake_home):
     generator.inject_zshrc()
     generator.inject_zshrc()
