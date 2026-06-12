@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from textual import work
 from textual.app import App
 
 from .. import detect
@@ -49,6 +50,59 @@ class WelchostApp(App):
             self.push_screen(EditMenu())
         else:
             self.push_screen(MainMenu())
+
+        # Check PyPI for a newer release and offer to update. Skipped in dev
+        # mode (don't nag while hacking on the tool itself).
+        if not detect.is_dev():
+            self._check_for_update()
+
+    # --- self-update -----------------------------------------------------------
+    # On launch, check PyPI in a background thread (so the network call never
+    # blocks or delays the UI) and, if a newer version exists, prompt the user.
+    # Failures (offline, timeout) are silent — the worker just finds nothing.
+
+    @work(thread=True, exclusive=True, group="update-check")
+    def _check_for_update(self) -> None:
+        from ..update import current_version, is_newer, latest_version
+
+        latest = latest_version()
+        if latest and is_newer(latest, current_version()):
+            self.call_from_thread(self._prompt_update, latest)
+
+    def _prompt_update(self, latest: str) -> None:
+        from ..update import current_version
+        from .screens.modals import ConfirmModal
+
+        message = (
+            f"welchost [b]v{latest}[/b] is available (you have v{current_version()}).\nUpdate now?"
+        )
+
+        def on_result(confirmed: bool | None) -> None:
+            if confirmed:
+                self._run_update()
+
+        self.push_screen(ConfirmModal(message, yes_label="update", no_label="later"), on_result)
+
+    @work(thread=True, exclusive=True, group="update-run")
+    def _run_update(self) -> None:
+        from ..update import detect_install_method, run_upgrade
+
+        method = detect_install_method()
+        self.call_from_thread(self.notify, f"Updating welchost via {method}…", timeout=4)
+        ok, output = run_upgrade(method)
+        if ok:
+            self.call_from_thread(
+                self.notify,
+                "Updated. Restart welchost to use the new version.",
+                timeout=8,
+            )
+        else:
+            self.call_from_thread(
+                self.notify,
+                f"Update failed: {output[-180:] or 'unknown error'}",
+                severity="error",
+                timeout=10,
+            )
 
     # --- config lifecycle ----------------------------------------------------
     # `model` is the working config; `had_config` tracks whether a config exists

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import Center, Vertical
+from textual.binding import Binding
+from textual.containers import Center, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widget import Widget
 from textual.widgets import Footer, Label, ListItem, ListView, Static
@@ -17,12 +18,23 @@ from ..logo import Logo
 class _Menu(Screen):
     """Base list-driven menu screen. Fully keyboard-driven."""
 
-    BINDINGS = [("escape", "app.pop_screen", "Back")]
+    BINDINGS = [Binding("escape", "back", "Back")]
 
     CSS = """
     _Menu #menu, _Menu #menu > ListItem { background: transparent; }
     _Menu #menu:focus > ListItem.-highlighted { background: $boost; }
+    /* Vertical containers + ListView default to height: 1fr, which splits the
+       viewport and squeezes the auto-height header (logo/byline) to nothing on
+       short terminals. Size them to content so the header keeps full height and
+       the VerticalScroll only scrolls when content truly overflows. */
+    _Menu #menu-box, _Menu #edit-header, _Menu #menu { height: auto; }
     """
+
+    def action_back(self) -> None:
+        """Pop to the previous screen. Root menus (MainMenu/EditMenu) override
+        this to a no-op so esc on the home screen can't pop the last screen off
+        the stack and leave a blank (black) screen."""
+        self.app.pop_screen()
 
     def items(self) -> list[tuple[str, str]]:  # (id, label)
         raise NotImplementedError
@@ -31,14 +43,18 @@ class _Menu(Screen):
         return Logo()
 
     def compose(self) -> ComposeResult:
-        with Center():
-            with Vertical(id="menu-box"):
-                yield self.header_widget()
-                yield ListView(
-                    *[ListItem(Label(label), id=key) for key, label in self.items()],
-                    id="menu",
-                )
-                yield Static("↑/↓ move · enter select · q quit", classes="hint")
+        # VerticalScroll so a short terminal scrolls instead of squeezing the
+        # auto-height header (logo + byline) down to nothing — the bug where the
+        # "by scooby" credit vanished on small windows.
+        with VerticalScroll():
+            with Center():
+                with Vertical(id="menu-box"):
+                    yield self.header_widget()
+                    yield ListView(
+                        *[ListItem(Label(label), id=key) for key, label in self.items()],
+                        id="menu",
+                    )
+                    yield Static("↑/↓ move · enter select · q quit", classes="hint")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -99,6 +115,12 @@ def _reset_target() -> str:
 class MainMenu(_Menu):
     """Shown when there is no existing config."""
 
+    # Home screen: esc must do nothing (there's no screen to go back to).
+    BINDINGS = [Binding("escape", "back", show=False)]
+
+    def action_back(self) -> None:
+        pass
+
     def items(self) -> list[tuple[str, str]]:
         a = f"[{ACCENT}]"
         rows = [
@@ -132,6 +154,12 @@ class EditMenu(_Menu):
     Branded like the main menu (logo) with an explicit indication that a welcome
     screen is active, then a clean choice: edit current vs create a new one.
     """
+
+    # Home screen: esc must do nothing (there's no screen to go back to).
+    BINDINGS = [Binding("escape", "back", show=False)]
+
+    def action_back(self) -> None:
+        pass
 
     def header_widget(self) -> Widget:
         m = self.app.model

@@ -12,6 +12,7 @@ from functools import lru_cache
 from rich.text import Text
 from textual.widgets import Static
 
+from .. import __version__
 from ..themes import ACCENT
 
 # Pixel-art ghost, built per-frame. The eyes look left/center/right (to read as a
@@ -98,7 +99,7 @@ def logo_text(frame: int = 0) -> Text:
         t.append(g.ljust(gw), style=f"bold {ACCENT}")
         t.append("   ")
         t.append(w + "\n", style=f"bold {ACCENT}")
-    t.append("\nby scooby · jakubsalmik.com", style="dim")
+    t.append(f"\nv{__version__} · by scooby · jakubsalmik.com", style="dim")
     return t
 
 
