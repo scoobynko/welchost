@@ -65,8 +65,11 @@ Token-based, matching `release.yml` (`password: ${{ secrets.PYPI_TOKEN }}`):
    ```bash
    gh repo create scoobynko/homebrew-welchost --public --add-readme
    ```
-2. Create a PAT with **repo** + **workflow** scope on the tap repo and store it on
-   the **main** repo so `release.yml` can push the formula bump:
+2. Create a **classic** PAT with the **`public_repo`** scope only (the tap is
+   public) and store it on the **main** repo so `release.yml` can push the formula
+   bump. Use a *classic* token — `bump-homebrew-formula-action` fails with
+   `invalid ref: refs/heads/main` against fine-grained PATs. Don't grant `repo`
+   (private access) or `workflow` (the bump never edits workflow files):
    ```bash
    gh secret set HOMEBREW_TAP_TOKEN --repo scoobynko/welchost
    ```
@@ -111,7 +114,7 @@ PR-gated `main` and automated releases coexist.)
 |---|---|---|
 | `GITHUB_TOKEN` | automatic | release, formula bump |
 | `PYPI_TOKEN` | pypi.org token | publish to PyPI |
-| `HOMEBREW_TAP_TOKEN` | PAT (repo+workflow) on the tap repo | bump the formula |
+| `HOMEBREW_TAP_TOKEN` | classic PAT, `public_repo` scope | bump the formula |
 
 ## After setup: how a release happens
 
