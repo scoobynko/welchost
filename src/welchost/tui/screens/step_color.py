@@ -1,10 +1,10 @@
-"""Wizard step 2 — color mode, swatches, hex input."""
+"""Wizard step 2 — color mode, presets, hex input (keyboard only)."""
 
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical
-from textual.widgets import Button, Input, Label, RadioButton, RadioSet
+from textual.containers import Vertical
+from textual.widgets import Input, Label, RadioButton, RadioSet
 
 SWATCHES = [
     "cyan",
@@ -12,43 +12,42 @@ SWATCHES = [
     "green",
     "yellow",
     "red",
-    "blue",
     "white",
+    "#d97757",
     "#cba6f7",
     "#89dceb",
-    "#fe8019",
 ]
 
 
 class StepColor(Vertical):
     """Edits banner.color_mode and the solid/gradient colors."""
 
-    title = "Step 2 · color"
+    title = "step 2 · color"
 
     def compose(self) -> ComposeResult:
-        yield Label("Color mode")
+        yield Label("mode", classes="section-label")
         with RadioSet(id="mode"):
-            yield RadioButton("Solid", id="mode-solid")
-            yield RadioButton("Gradient", id="mode-gradient")
+            yield RadioButton("solid", id="mode-solid")
+            yield RadioButton("gradient", id="mode-gradient")
 
         with Vertical(id="solid-box"):
-            yield Label("Solid color (Rich name or #rrggbb)")
+            yield Label("color (name or #rrggbb)", classes="section-label")
             yield Input(placeholder="cyan", id="solid")
-            with Horizontal(id="swatches"):
+            yield Label("presets", classes="section-label")
+            with RadioSet(id="swatches"):
                 for c in SWATCHES:
-                    yield Button(c, id=f"sw-{c.lstrip('#')}", classes="swatch")
+                    yield RadioButton(c, id=f"sw-{c.lstrip('#')}")
 
         with Vertical(id="grad-box"):
-            yield Label("Gradient start")
+            yield Label("gradient start", classes="section-label")
             yield Input(placeholder="#ff6b35", id="grad_start")
-            yield Label("Gradient end")
+            yield Label("gradient end", classes="section-label")
             yield Input(placeholder="#f7c59f", id="grad_end")
 
     def load_from_model(self) -> None:
         m = self.app.model
         is_grad = m.banner.color_mode == "gradient"
-        target = "#mode-gradient" if is_grad else "#mode-solid"
-        self.query_one(target, RadioButton).value = True
+        self.query_one("#mode-gradient" if is_grad else "#mode-solid", RadioButton).value = True
         self.query_one("#solid", Input).value = m.solid.value
         self.query_one("#grad_start", Input).value = m.gradient.start
         self.query_one("#grad_end", Input).value = m.gradient.end
@@ -59,10 +58,16 @@ class StepColor(Vertical):
         self.query_one("#grad-box").display = is_grad
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
-        is_grad = event.radio_set.pressed_index == 1
-        self.app.model.banner.color_mode = "gradient" if is_grad else "solid"
-        self._toggle(is_grad)
-        self.app.refresh_preview()
+        if event.radio_set.id == "mode":
+            is_grad = event.radio_set.pressed_index == 1
+            self.app.model.banner.color_mode = "gradient" if is_grad else "solid"
+            self._toggle(is_grad)
+            self.app.refresh_preview()
+        elif event.radio_set.id == "swatches" and event.pressed is not None:
+            value = str(event.pressed.label)
+            self.query_one("#solid", Input).value = value
+            self.app.model.solid.value = value
+            self.app.refresh_preview()
 
     def on_input_changed(self, event: Input.Changed) -> None:
         m = self.app.model
@@ -73,10 +78,3 @@ class StepColor(Vertical):
         elif event.input.id == "grad_end":
             m.gradient.end = event.value or "magenta"
         self.app.refresh_preview()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id and event.button.id.startswith("sw-"):
-            value = str(event.button.label)
-            self.query_one("#solid", Input).value = value
-            self.app.model.solid.value = value
-            self.app.refresh_preview()

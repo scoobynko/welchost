@@ -26,8 +26,12 @@ class WelchostApp(App):
 
     CSS = """
     Screen { align: center top; }
-    .panel-title { text-style: bold; padding: 1 0 0 1; }
-    .hint { color: $text-muted; padding: 0 1; }
+    #menu-box, #wizard-body { width: 72; max-width: 100%; padding: 1 2; }
+    .panel-title { text-style: bold; padding: 1 0 0 1; color: $text-muted; }
+    .hint { color: $text-muted; padding: 1 2; }
+    .section-label { text-style: bold; padding: 1 0 0 0; }
+    ListView { padding: 0; margin: 1 0; }
+    ListItem { padding: 0 1; }
     """
 
     def __init__(self) -> None:

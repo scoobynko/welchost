@@ -7,25 +7,12 @@ from pyfiglet import Figlet
 
 from welchost.themes import THEMES, all_themes, get_theme
 
-EXPECTED = {
-    "ghost",
-    "hacker",
-    "dracula",
-    "catppuccin",
-    "nord",
-    "gruvbox",
-    "tokyo-night",
-    "monochrome",
-    "hot",
-    "ocean",
-    "matrix",
-    "sunset",
-}
+EXPECTED = {"claude", "codex", "ghost", "matrix", "sunset", "mono"}
 
 
-def test_all_twelve_themes_present():
+def test_all_themes_present():
     assert set(THEMES) == EXPECTED
-    assert len(all_themes()) == 12
+    assert len(all_themes()) == len(EXPECTED)
 
 
 @pytest.mark.parametrize("theme", all_themes(), ids=lambda t: t.name)

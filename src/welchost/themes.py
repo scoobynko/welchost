@@ -1,7 +1,8 @@
-"""The 12 built-in themes.
+"""The built-in templates.
 
-Each theme is plain data that converts to a full :class:`WelchostConfig`. No I/O.
-Font names here must all be valid pyfiglet fonts (enforced by test_themes.py).
+Each template is plain data that converts to a full :class:`WelchostConfig`.
+No I/O. Every font name here must be a valid pyfiglet font (enforced by
+test_themes.py).
 """
 
 from __future__ import annotations
@@ -17,6 +18,9 @@ from .config import (
     WelchostConfig,
 )
 
+# Brand accent (matches the terracotta used on jakubsalmik.com).
+ACCENT = "#d97757"
+
 
 @dataclass(frozen=True)
 class Theme:
@@ -24,7 +28,7 @@ class Theme:
     font: str
     border_style: str
     border_color: str
-    # solid color OR gradient (start/end). If gradient is set, color_mode=gradient.
+    blurb: str = ""
     color: str | None = None
     gradient_start: str | None = None
     gradient_end: str | None = None
@@ -57,25 +61,22 @@ class Theme:
 THEMES: dict[str, Theme] = {
     t.name: t
     for t in [
-        Theme("ghost", "slant", "panel", "magenta", color="cyan"),
-        Theme("hacker", "doom", "box", "green", color="green"),
-        Theme("dracula", "standard", "rounded", "#f38ba8", color="#cba6f7"),
-        Theme("catppuccin", "big", "panel", "#89dceb", color="#cba6f7"),
-        Theme("nord", "thin", "panel", "#8fbcbb", color="#88c0d0"),
-        Theme("gruvbox", "banner", "box", "#fabd2f", color="#fe8019"),
-        Theme("tokyo-night", "nancyj", "panel", "#7aa2f7", color="#bb9af7"),
-        Theme("monochrome", "larry3d", "double", "white", color="white"),
-        Theme("hot", "epic", "box", "yellow", color="red"),
-        Theme("ocean", "univers", "rounded", "#00ccff", color="#0099ff"),
-        Theme("matrix", "banner", "none", "green", color="bright_green"),
+        Theme("claude", "ansi_shadow", "rounded", ACCENT, "filled · terracotta", color=ACCENT),
+        Theme("codex", "ansi_regular", "box", "cyan", "filled · clean", color="white"),
+        Theme("ghost", "slant", "panel", "magenta", "the classic", color="cyan"),
+        Theme(
+            "matrix", "ansi_regular", "none", "green", "filled · borderless", color="bright_green"
+        ),
         Theme(
             "sunset",
             "slant",
             "panel",
             "#ff6b35",
+            "gradient demo",
             gradient_start="#ff6b35",
             gradient_end="#f7c59f",
         ),
+        Theme("mono", "pagga", "none", "white", "compact · minimal", color="white"),
     ]
 }
 

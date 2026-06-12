@@ -72,10 +72,28 @@ def _env() -> Environment:
     )
 
 
+def font_exists(name: str) -> bool:
+    """True if ``name`` is a valid pyfiglet font."""
+    from pyfiglet import FigletFont
+
+    try:
+        FigletFont(font=name)
+        return True
+    except Exception:
+        return False
+
+
 def build_figlet(config: WelchostConfig) -> str:
-    """Render the banner text to ASCII art with pyfiglet."""
+    """Render the banner text to ASCII art with pyfiglet.
+
+    Falls back to the ``standard`` font if the configured font is missing, so a
+    bad font name can never crash generation or install.
+    """
     width = SIZE_WIDTH.get(config.banner.size, 80)
-    fig = Figlet(font=config.banner.font, width=width)
+    try:
+        fig = Figlet(font=config.banner.font, width=width)
+    except Exception:
+        fig = Figlet(font="standard", width=width)
     return fig.renderText(config.banner.text).rstrip("\n")
 
 
@@ -129,13 +147,19 @@ def _info_dict(config: WelchostConfig) -> dict[str, bool]:
 
 
 def write_generated_files(config: WelchostConfig) -> tuple[Path, Path]:
-    """Write welcome.zsh and welcome_banner.py, creating the config dir."""
+    """Write welcome.zsh and welcome_banner.py, creating the config dir.
+
+    Both files are rendered to strings *before* anything is written, so a render
+    error can never leave a half-installed state on disk.
+    """
+    zsh_text = render_welcome_zsh(config)
+    banner_text = render_welcome_banner(config)
     detect.ensure_config_dir()
     zsh_path = detect.get_welcome_zsh_path()
     banner_path = detect.get_welcome_banner_path()
-    zsh_path.write_text(render_welcome_zsh(config))
+    banner_path.write_text(banner_text)
+    zsh_path.write_text(zsh_text)
     zsh_path.chmod(0o755)
-    banner_path.write_text(render_welcome_banner(config))
     return zsh_path, banner_path
 
 

@@ -26,11 +26,11 @@ class StepDecoration(Vertical):
     title = "Step 3 · decoration + info"
 
     def compose(self) -> ComposeResult:
-        yield Label("Border style")
+        yield Label("border style", classes="section-label")
         yield Select([(s, s) for s in BORDER_STYLES], id="border", allow_blank=False)
-        yield Label("Border color (Rich name or #rrggbb)")
+        yield Label("border color (name or #rrggbb)", classes="section-label")
         yield Input(placeholder="magenta", id="border_color")
-        yield Label("Info widgets")
+        yield Label("info widgets", classes="section-label")
         for field, label in INFO_FIELDS:
             with Vertical(classes="info-row"):
                 yield Switch(id=f"info-{field}")

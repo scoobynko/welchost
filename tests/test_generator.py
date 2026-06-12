@@ -96,3 +96,28 @@ def test_build_figlet_nonempty(fake_home):
     cfg = WelchostConfig.default()
     art = generator.build_figlet(cfg)
     assert art.strip()
+
+
+def test_build_figlet_invalid_font_falls_back(fake_home):
+    cfg = WelchostConfig.default()
+    cfg.banner.font = "definitely-not-a-font"
+    # Must not raise; falls back to the standard font.
+    assert generator.build_figlet(cfg).strip()
+
+
+def test_install_with_bad_font_does_not_half_write(fake_home):
+    cfg = WelchostConfig.default()
+    cfg.banner.font = "definitely-not-a-font"
+    from welchost.config import save_config
+
+    save_config(cfg)
+    generator.install(cfg)
+    assert detect.get_welcome_banner_path().exists()
+    assert detect.get_welcome_zsh_path().exists()
+
+
+def test_curated_fonts_are_all_valid():
+    from welchost.tui.fonts import CURATED
+
+    invalid = [f for f in CURATED if not generator.font_exists(f)]
+    assert invalid == [], f"invalid curated fonts: {invalid}"
