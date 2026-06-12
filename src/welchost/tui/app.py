@@ -74,8 +74,7 @@ class WelchostApp(App):
         from .screens.modals import ConfirmModal
 
         message = (
-            f"welchost [b]v{latest}[/b] is available "
-            f"(you have v{current_version()}).\nUpdate now?"
+            f"welchost [b]v{latest}[/b] is available (you have v{current_version()}).\nUpdate now?"
         )
 
         def on_result(confirmed: bool | None) -> None:
