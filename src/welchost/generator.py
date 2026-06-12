@@ -10,13 +10,21 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 
 from jinja2 import Environment, PackageLoader, select_autoescape
 from pyfiglet import Figlet
 
 from . import __version__, detect
-from .config import WelchostConfig
+from .config import (
+    VALID_ALIGN,
+    VALID_BORDER_STYLES,
+    VALID_COLOR_MODES,
+    VALID_GRADIENT_DIRECTIONS,
+    WelchostConfig,
+)
+from .ornaments import get_ornament
 
 # --- sentinel markers --------------------------------------------------------
 SENTINEL_START = "# >>> welchost >>>"
@@ -46,22 +54,38 @@ NAMED_COLORS: dict[str, tuple[int, int, int]] = {
     "gray": (128, 128, 128),
 }
 
-# pyfiglet width per size.
-SIZE_WIDTH = {"auto": 80, "sm": 60, "md": 80, "lg": 110, "xl": 140}
+# Wrap width handed to pyfiglet. Kept large so wide / outline fonts render the
+# whole word on one line instead of wrapping each letter onto extra rows; the
+# chosen font *is* the size. (pyfiglet only wraps when text exceeds this — it
+# does not pad to the width — so a big value costs nothing for small fonts.)
+FIGLET_WIDTH = 1000
+
+
+FALLBACK_RGB = (204, 204, 204)
 
 
 def resolve_color(value: str) -> tuple[int, int, int]:
-    """Resolve a Rich color name or #rrggbb hex to an (r, g, b) tuple."""
+    """Resolve a Rich color name or #rgb / #rrggbb hex to an (r, g, b) tuple.
+
+    Always returns a 3-tuple. Anything unparseable — an unknown name, or a hex of
+    the wrong length (including the partial values typed live in the color field,
+    e.g. ``#ff``, or a malformed value from a hand-edited welchost.toml) — falls
+    back to a neutral gray instead of returning a wrong-length tuple that would
+    crash the caller's ``r, g, b = resolve_color(...)`` unpack.
+    """
     value = (value or "").strip()
     if value.startswith("#"):
-        h = value.lstrip("#")
+        h = value[1:]
         if len(h) == 3:
             h = "".join(c * 2 for c in h)
+        if len(h) != 6:
+            return FALLBACK_RGB
         try:
-            return tuple(bytes.fromhex(h))  # type: ignore[return-value]
+            r, g, b = bytes.fromhex(h)
         except ValueError:
-            return (204, 204, 204)
-    return NAMED_COLORS.get(value.lower(), (204, 204, 204))
+            return FALLBACK_RGB
+        return (r, g, b)
+    return NAMED_COLORS.get(value.lower(), FALLBACK_RGB)
 
 
 def _env() -> Environment:
@@ -83,18 +107,25 @@ def font_exists(name: str) -> bool:
         return False
 
 
+@lru_cache(maxsize=64)
+def _render_figlet(font: str, text: str) -> str:
+    """Cached pyfiglet render keyed by (font, text). The TUI preview re-renders on
+    every keystroke — including color/border edits that change neither font nor
+    text — so memoizing avoids reconstructing/reparsing the font each time."""
+    try:
+        fig = Figlet(font=font, width=FIGLET_WIDTH)
+    except Exception:
+        fig = Figlet(font="standard", width=FIGLET_WIDTH)
+    return fig.renderText(text).rstrip("\n")
+
+
 def build_figlet(config: WelchostConfig) -> str:
-    """Render the banner text to ASCII art with pyfiglet.
+    """Render the banner text to ASCII art with pyfiglet at the font's native size.
 
     Falls back to the ``standard`` font if the configured font is missing, so a
     bad font name can never crash generation or install.
     """
-    width = SIZE_WIDTH.get(config.banner.size, 80)
-    try:
-        fig = Figlet(font=config.banner.font, width=width)
-    except Exception:
-        fig = Figlet(font="standard", width=width)
-    return fig.renderText(config.banner.text).rstrip("\n")
+    return _render_figlet(config.banner.font, config.banner.text)
 
 
 # --- template rendering ------------------------------------------------------
@@ -108,23 +139,45 @@ def render_welcome_zsh(config: WelchostConfig) -> str:
     )
 
 
+def _enum(value: str, allowed: tuple[str, ...], default: str) -> str:
+    """Clamp an enum-valued config string to a known-safe member.
+
+    These strings are interpolated verbatim into the generated welcome_banner.py
+    source. welchost.toml is user-editable and shareable, so a value like
+    ``align = '"; __import__("os").system("…")'`` must never reach the template —
+    clamping to the schema's allowed set closes that code-injection vector and
+    also guards against typos.
+    """
+    return value if value in allowed else default
+
+
 def render_welcome_banner(config: WelchostConfig) -> str:
     art = build_figlet(config)
-    border_rgb = (
-        None
-        if config.decoration.border_style == "none"
-        else resolve_color(config.decoration.border_color)
-    )
+    # Clamp every enum baked as a raw string into the generated Python source.
+    align = _enum(config.banner.align, VALID_ALIGN, "left")
+    color_mode = _enum(config.banner.color_mode, VALID_COLOR_MODES, "solid")
+    grad_direction = _enum(config.gradient.direction, VALID_GRADIENT_DIRECTIONS, "horizontal")
+    border_style = _enum(config.decoration.border_style, VALID_BORDER_STYLES, "none")
+
+    border_rgb = None if border_style == "none" else resolve_color(config.decoration.border_color)
+    orn_left, orn_right = get_ornament(config.ornament.name)
+    orn_color = config.gradient.start if color_mode == "gradient" else config.solid.value
+    orn_rgb = resolve_color(orn_color) if (orn_left or orn_right) else None
     template = _env().get_template("welcome_banner.py.j2")
     return template.render(
         version=__version__,
         art_json=json.dumps(art),
-        color_mode=config.banner.color_mode,
+        align=align,
+        color_mode=color_mode,
+        grad_direction=grad_direction,
         solid_rgb=repr(resolve_color(config.solid.value)),
         grad_start_rgb=repr(resolve_color(config.gradient.start)),
         grad_end_rgb=repr(resolve_color(config.gradient.end)),
-        border_style=config.decoration.border_style,
+        border_style=border_style,
         border_rgb=repr(border_rgb),
+        orn_left=json.dumps(orn_left),
+        orn_right=json.dumps(orn_right),
+        orn_rgb=repr(orn_rgb),
         info=repr(_info_dict(config)),
     )
 
@@ -177,7 +230,9 @@ def _sentinel_block() -> str:
             src = f"~/{rel}"
         except ValueError:
             src = str(welcome)
-    line = f'[[ "$TERM_PROGRAM" == "ghostty" && $- == *i* ]] && source {src}'
+    # Gate: interactive Ghostty shells only, and only if the shim is still there
+    # (the `-r` guard means a deleted welcome.zsh can't error on every prompt).
+    line = f'[[ "$TERM_PROGRAM" == "ghostty" && $- == *i* && -r {src} ]] && source {src}'
     return f"{SENTINEL_START}\n{line}\n{SENTINEL_END}\n"
 
 

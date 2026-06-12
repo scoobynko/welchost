@@ -21,6 +21,7 @@ from rich.text import Text
 
 from .config import WelchostConfig
 from .generator import build_figlet, resolve_color
+from .ornaments import get_ornament
 
 _BOX_MAP = {
     "panel": HEAVY,
@@ -31,32 +32,112 @@ _BOX_MAP = {
 }
 
 
-def _gradient_line(line: str, start: str, end: str) -> Text:
-    s = resolve_color(start)
-    e = resolve_color(end)
-    n = max(len(line) - 1, 1)
-    t = Text()
-    for i, ch in enumerate(line):
-        f = i / n
-        r = round(s[0] + (e[0] - s[0]) * f)
-        g = round(s[1] + (e[1] - s[1]) * f)
-        b = round(s[2] + (e[2] - s[2]) * f)
-        t.append(ch, style=f"bold rgb({r},{g},{b})")
-    return t
+def _blend(s: tuple[int, int, int], e: tuple[int, int, int], f: float) -> tuple[int, int, int]:
+    return (
+        round(s[0] + (e[0] - s[0]) * f),
+        round(s[1] + (e[1] - s[1]) * f),
+        round(s[2] + (e[2] - s[2]) * f),
+    )
+
+
+def _gradient_factor(col: int, row: int, dx: int, dy: int, direction: str) -> float:
+    """Position 0→1 of a character within the block for the given direction."""
+    if direction == "vertical":
+        return row / dy
+    if direction == "diagonal":
+        return (col / dx + row / dy) / 2
+    return col / dx  # horizontal (default)
+
+
+def _strip_blank_edges(lines: list[str]) -> list[str]:
+    """Drop leading/trailing all-blank lines (mirrors the generated script) so the
+    gradient spans exactly the visible rows — otherwise vertical/diagonal blends
+    waste range on empty rows and look uneven."""
+    out = list(lines)
+    while out and not out[0].strip():
+        out.pop(0)
+    while out and not out[-1].strip():
+        out.pop()
+    return out
+
+
+def _art_rows(cfg: WelchostConfig, lines: list[str]) -> list[Text]:
+    """One styled Text per art line (gradient or solid)."""
+    rows: list[Text] = []
+    if cfg.banner.color_mode == "gradient":
+        s = resolve_color(cfg.gradient.start)
+        e = resolve_color(cfg.gradient.end)
+        direction = cfg.gradient.direction
+        dx = max(max((len(ln) for ln in lines), default=1) - 1, 1)
+        dy = max(len(lines) - 1, 1)
+        for row, line in enumerate(lines):
+            tx = Text()
+            for col, ch in enumerate(line):
+                f = _gradient_factor(col, row, dx, dy, direction)
+                r, g, b = _blend(s, e, f)
+                tx.append(ch, style=f"bold rgb({r},{g},{b})")
+            rows.append(tx)
+    else:
+        r, g, b = resolve_color(cfg.solid.value)
+        rows = [Text(line, style=f"bold rgb({r},{g},{b})") for line in lines]
+    return rows
+
+
+def _flank(rows: list[Text], cfg: WelchostConfig) -> list[Text]:
+    """Place the configured ornament left and right of the art rows, centered."""
+    left, right = get_ornament(cfg.ornament.name)
+    if not left and not right:
+        return rows
+
+    color = cfg.gradient.start if cfg.banner.color_mode == "gradient" else cfg.solid.value
+    r, g, b = resolve_color(color)
+    style = f"rgb({r},{g},{b})"
+    lw = max((len(s) for s in left), default=0)
+    rw = max((len(s) for s in right), default=0)
+    art_w = max((row.cell_len for row in rows), default=0)
+    total = max(len(rows), len(left), len(right))
+    a_off = (total - len(rows)) // 2
+    l_off = (total - len(left)) // 2
+    r_off = (total - len(right)) // 2
+    gap = "   "
+
+    out: list[Text] = []
+    for i in range(total):
+        line = Text()
+        if lw:
+            ls = left[i - l_off] if 0 <= i - l_off < len(left) else ""
+            line.append(ls.ljust(lw), style=style)
+            line.append(gap)
+        ai = i - a_off
+        if 0 <= ai < len(rows):
+            line.append_text(rows[ai])
+            line.append(" " * (art_w - rows[ai].cell_len))
+        else:
+            line.append(" " * art_w)
+        if rw:
+            rs = right[i - r_off] if 0 <= i - r_off < len(right) else ""
+            line.append(gap)
+            line.append(rs.ljust(rw), style=style)
+        out.append(line)
+    return out
 
 
 def render_art(cfg: WelchostConfig) -> Text:
-    """The colored figlet block (no border, no info)."""
+    """The colored figlet block (no border, no info), optionally flanked by an
+    ornament.
+
+    Gradient runs across the whole block per ``gradient.direction`` — horizontal
+    (left→right), vertical (top→bottom), or diagonal — so the factor is computed
+    from each character's position within the block, not just within its line.
+    """
     art = build_figlet(cfg)
-    lines = art.splitlines()
+    lines = _strip_blank_edges(art.splitlines())
+    rows = _flank(_art_rows(cfg, lines), cfg)
+
     block = Text()
-    for idx, line in enumerate(lines):
-        if cfg.banner.color_mode == "gradient":
-            block.append_text(_gradient_line(line, cfg.gradient.start, cfg.gradient.end))
-        else:
-            r, g, b = resolve_color(cfg.solid.value)
-            block.append(line, style=f"bold rgb({r},{g},{b})")
-        if idx != len(lines) - 1:
+    for i, row in enumerate(rows):
+        block.append_text(row)
+        if i != len(rows) - 1:
             block.append("\n")
     return block
 
@@ -93,7 +174,12 @@ def info_text(cfg: WelchostConfig) -> Text | None:
 
 
 def render_banner(cfg: WelchostConfig) -> RenderableType:
-    """Full banner: colored art + info, wrapped in the chosen border."""
+    """Full banner: colored art + info, wrapped in the chosen border.
+
+    The whole block/box is then aligned within the available width per
+    ``banner.align`` (left | center | right), so the preview matches how the
+    generated script positions the banner in the terminal.
+    """
     block = render_art(cfg)
     info = info_text(cfg)
     if info is not None:
@@ -102,12 +188,16 @@ def render_banner(cfg: WelchostConfig) -> RenderableType:
 
     style = cfg.decoration.border_style
     if style == "none":
-        return block
-    br, bg, bb = resolve_color(cfg.decoration.border_color)
-    return Panel(
-        Align.left(block),
-        box=_BOX_MAP.get(style, SQUARE),
-        border_style=f"rgb({br},{bg},{bb})",
-        expand=False,
-        padding=(0, 1),
-    )
+        renderable: RenderableType = block
+    else:
+        br, bg, bb = resolve_color(cfg.decoration.border_color)
+        renderable = Panel(
+            Align.left(block),
+            box=_BOX_MAP.get(style, SQUARE),
+            border_style=f"rgb({br},{bg},{bb})",
+            expand=False,
+            padding=(0, 1),
+        )
+
+    align = cfg.banner.align if cfg.banner.align in ("left", "center", "right") else "left"
+    return Align(renderable, align=align)  # type: ignore[arg-type]

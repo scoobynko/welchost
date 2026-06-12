@@ -15,12 +15,17 @@ from datetime import datetime
 
 # --- baked-in config (from welchost.toml) -----------------------------------
 ART = {{ art_json }}
+ALIGN = "{{ align }}"
 COLOR_MODE = "{{ color_mode }}"
+GRAD_DIR = "{{ grad_direction }}"
 SOLID_RGB = {{ solid_rgb }}
 GRAD_START = {{ grad_start_rgb }}
 GRAD_END = {{ grad_end_rgb }}
 BORDER_STYLE = "{{ border_style }}"
 BORDER_RGB = {{ border_rgb }}
+ORN_LEFT = {{ orn_left }}
+ORN_RIGHT = {{ orn_right }}
+ORN_RGB = {{ orn_rgb }}
 INFO = {{ info }}
 
 RESET = "\x1b[0m"
@@ -39,14 +44,24 @@ def fg(rgb):
     return f"\x1b[1;38;2;{r};{g};{b}m"
 
 
-def colorize_line(line):
+def _factor(col, row, dx, dy):
+    # Position 0→1 of a character within the block, per gradient direction.
+    if GRAD_DIR == "vertical":
+        return row / dy
+    if GRAD_DIR == "diagonal":
+        return (col / dx + row / dy) / 2
+    return col / dx  # horizontal (default)
+
+
+def colorize_line(line, row=0, nrows=1, maxw=1):
     if not line:
         return line
     if COLOR_MODE == "gradient":
-        n = max(len(line) - 1, 1)
+        dx = max(maxw - 1, 1)
+        dy = max(nrows - 1, 1)
         out = []
-        for i, ch in enumerate(line):
-            t = i / n
+        for col, ch in enumerate(line):
+            t = _factor(col, row, dx, dy)
             r = round(GRAD_START[0] + (GRAD_END[0] - GRAD_START[0]) * t)
             g = round(GRAD_START[1] + (GRAD_END[1] - GRAD_START[1]) * t)
             b = round(GRAD_START[2] + (GRAD_END[2] - GRAD_START[2]) * t)
@@ -58,6 +73,60 @@ def colorize_line(line):
 def visible_len(s):
     # length of the raw (uncolored) string; ART lines are stored uncolored
     return len(s)
+
+
+def align_pad(box_width):
+    # Leading spaces to position the whole box within the terminal width. This
+    # script runs on every interactive shell, so the default left alignment does
+    # zero work — shutil is imported and the terminal size queried only when the
+    # banner is actually centered or right-aligned.
+    if ALIGN == "left":
+        return ""
+    import shutil
+
+    try:
+        cols = shutil.get_terminal_size((80, 24)).columns
+    except Exception:
+        cols = 80
+    space = max(cols - box_width, 0)
+    if ALIGN == "center":
+        return " " * (space // 2)
+    if ALIGN == "right":
+        return " " * space
+    return ""
+
+
+def flank(art_lines, colored, artw):
+    # Place ORN_LEFT/ORN_RIGHT either side of the art, centered vertically.
+    # Returns (plain_lines, display_lines); plain is used for width/border math.
+    lw = max((len(s) for s in ORN_LEFT), default=0)
+    rw = max((len(s) for s in ORN_RIGHT), default=0)
+    total = max(len(art_lines), len(ORN_LEFT), len(ORN_RIGHT))
+    a_off = (total - len(art_lines)) // 2
+    l_off = (total - len(ORN_LEFT)) // 2
+    r_off = (total - len(ORN_RIGHT)) // 2
+    oc = fg(ORN_RGB) if ORN_RGB else ""
+    oce = RESET if ORN_RGB else ""
+    gap = "   "
+    plain, disp = [], []
+    for i in range(total):
+        ls = ORN_LEFT[i - l_off] if 0 <= i - l_off < len(ORN_LEFT) else ""
+        rs = ORN_RIGHT[i - r_off] if 0 <= i - r_off < len(ORN_RIGHT) else ""
+        ai = i - a_off
+        art_p = art_lines[ai] if 0 <= ai < len(art_lines) else ""
+        art_d = colored[ai] if 0 <= ai < len(colored) else ""
+        p, d = "", ""
+        if lw:
+            p += ls.ljust(lw) + gap
+            d += oc + ls.ljust(lw) + oce + gap
+        p += art_p.ljust(artw)
+        d += art_d + " " * (artw - len(art_p))
+        if rw:
+            p += gap + rs.ljust(rw)
+            d += gap + oc + rs.ljust(rw) + oce
+        plain.append(p)
+        disp.append(d)
+    return plain, disp
 
 
 def info_lines():
@@ -112,8 +181,19 @@ def render():
     while art_lines and art_lines[0].strip() == "":
         art_lines.pop(0)
 
-    body = list(art_lines)
+    # Gradient is positioned across the art block only (info lines are plain), so
+    # colorize art lines up front by their row index — this also disambiguates
+    # repeated art lines that a value-based `ln in art_lines` check would confuse.
+    nrows = len(art_lines)
+    artw = max((visible_len(ln) for ln in art_lines), default=0)
+    colored = [colorize_line(ln, row, nrows, artw) for row, ln in enumerate(art_lines)]
+
+    # Flank with ornaments (centered) before measuring width / drawing the border.
+    if ORN_LEFT or ORN_RIGHT:
+        art_lines, colored = flank(art_lines, colored, artw)
+
     extra = info_lines()
+    body = list(art_lines)
     if extra:
         body.append("")
         body.extend(extra)
@@ -121,10 +201,11 @@ def render():
     width = max((visible_len(ln) for ln in body), default=0)
 
     if BORDER_STYLE == "none":
-        for ln in art_lines:
-            print(colorize_line(ln))
+        lead = align_pad(width)
+        for ln in colored:
+            print(lead + ln)
         for ln in extra:
-            print(ln)
+            print(lead + ln)
         return
 
     chars = BORDERS.get(BORDER_STYLE, BORDERS["box"])
@@ -133,14 +214,16 @@ def render():
     inner = width + pad * 2
     bc = fg(BORDER_RGB) if BORDER_RGB else ""
     bce = RESET if BORDER_RGB else ""
+    lead = align_pad(inner + 2)  # box is the inner width plus the two border cols
 
-    print(f"{bc}{tl}{h * inner}{tr}{bce}")
-    for ln in body:
-        is_art = ln in art_lines and ln != ""
-        content = colorize_line(ln) if is_art else ln
+    print(f"{lead}{bc}{tl}{h * inner}{tr}{bce}")
+    for idx, ln in enumerate(body):
+        # body == art_lines + ["", *info]; the first len(colored) entries are the
+        # (possibly ornament-flanked) art block, the rest are plain info lines.
+        content = colored[idx] if idx < len(colored) else ln
         gap = " " * (width - visible_len(ln))
-        print(f"{bc}{v}{bce}{' ' * pad}{content}{gap}{' ' * pad}{bc}{v}{bce}")
-    print(f"{bc}{bl}{h * inner}{br}{bce}")
+        print(f"{lead}{bc}{v}{bce}{' ' * pad}{content}{gap}{' ' * pad}{bc}{v}{bce}")
+    print(f"{lead}{bc}{bl}{h * inner}{br}{bce}")
 
 
 if __name__ == "__main__":

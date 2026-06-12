@@ -14,6 +14,7 @@ from .config import (
     Decoration,
     GradientColor,
     Info,
+    Ornament,
     SolidColor,
     WelchostConfig,
 )
@@ -32,6 +33,8 @@ class Theme:
     color: str | None = None
     gradient_start: str | None = None
     gradient_end: str | None = None
+    gradient_direction: str = "horizontal"
+    ornament: str = "none"
 
     @property
     def is_gradient(self) -> bool:
@@ -48,12 +51,14 @@ class Theme:
         gradient = GradientColor(
             start=self.gradient_start or "cyan",
             end=self.gradient_end or "magenta",
+            direction=self.gradient_direction,
         )
         return WelchostConfig(
-            banner=Banner(text=text, font=self.font, size="auto", color_mode=color_mode),
+            banner=Banner(text=text, font=self.font, color_mode=color_mode),
             solid=solid,
             gradient=gradient,
             decoration=Decoration(border_style=self.border_style, border_color=self.border_color),
+            ornament=Ornament(name=self.ornament),
             info=Info(),
         )
 
@@ -63,7 +68,15 @@ THEMES: dict[str, Theme] = {
     for t in [
         Theme("claude", "ansi_shadow", "rounded", ACCENT, "filled · terracotta", color=ACCENT),
         Theme("codex", "ansi_regular", "box", "cyan", "filled · clean", color="white"),
-        Theme("ghost", "slant", "panel", "magenta", "the classic", color="cyan"),
+        Theme(
+            "ghost",
+            "slant",
+            "none",
+            "magenta",
+            "the classic · ghosts",
+            color="cyan",
+            ornament="ghosts",
+        ),
         Theme(
             "matrix", "ansi_regular", "none", "green", "filled · borderless", color="bright_green"
         ),
@@ -72,9 +85,10 @@ THEMES: dict[str, Theme] = {
             "slant",
             "panel",
             "#ff6b35",
-            "gradient demo",
+            "gradient demo · diagonal",
             gradient_start="#ff6b35",
             gradient_end="#f7c59f",
+            gradient_direction="diagonal",
         ),
         Theme("mono", "pagga", "none", "white", "compact · minimal", color="white"),
     ]

@@ -12,6 +12,7 @@ from rich.console import Console
 
 from . import __version__, detect
 from .config import WelchostConfig, load_config
+from .generator import SENTINEL_START
 from .generator import reset as do_reset
 from .render import render_banner
 
@@ -132,7 +133,7 @@ def doctor() -> None:
     )
 
     zshrc = detect.get_zshrc()
-    injected = zshrc.exists() and "# >>> welchost >>>" in zshrc.read_text()
+    injected = zshrc.exists() and SENTINEL_START in zshrc.read_text()
     row(".zshrc sentinel present", injected, str(zshrc))
 
     console.print(table)
