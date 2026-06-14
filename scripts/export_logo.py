@@ -36,6 +36,7 @@ from welchost.themes import ACCENT  # noqa: E402
 from welchost.tui.logo import _FRAMES, _ghost_frame, _wordmark  # noqa: E402
 
 DEFAULT_BG = "#1a1a1a"  # Ghostty-ish dark, so the ░ shade reads with depth (Image #2)
+SHADE_DARKEN = 0.62  # the two-tone (░) base = accent darkened toward black by this factor
 
 
 def hex_rgb(value: str) -> tuple[int, int, int]:
@@ -74,13 +75,14 @@ def render_frame(
     padding: int,
     bg: tuple[int, int, int] | None,
     accent: tuple[int, int, int],
-    shade: tuple[int, int, int],
+    shade: tuple[int, int, int, int],
 ) -> Image.Image:
     """Decompose block glyphs to a sub-pixel grid and scale up with nearest-neighbor
-    so the pixels stay crisp (no anti-alias blur)."""
+    so the pixels stay crisp (no anti-alias blur). ``shade`` is RGBA so the two-tone
+    cells can be a lower-opacity accent that adapts to whatever sits behind them."""
     transparent = bg is None
     fill_bg = (0, 0, 0, 0) if transparent else (*bg, 255)
-    a, s = (*accent, 255), (*shade, 255)
+    a, s = (*accent, 255), shade
 
     cols = max((len(r) for r in rows), default=0)
     grid_w, grid_h = cols, len(rows) * 2  # each char row = 2 stacked sub-pixels
@@ -123,31 +125,33 @@ def render_svg(
     bg: tuple[int, int, int] | None,
     accent: tuple[int, int, int],
     shade: tuple[int, int, int],
+    opacity: float,
 ) -> str:
-    """Emit the (static) logo as SVG: each block glyph becomes solid <rect>s on a
-    1x2 sub-cell grid. Horizontally-adjacent same-color cells are merged into one
-    rect (run-length) to keep the file small. Vector = crisp at any size."""
-    a, s = _hex(accent), _hex(shade)
+    """Emit the (static) logo as SVG: each block glyph becomes <rect>s on a 1x2
+    sub-cell grid. The two-tone cells use the darkened ``shade`` color at ``opacity``
+    (real vector alpha), so the SVG adapts to any background. Horizontally-adjacent
+    same-kind cells merge into one rect (run-length) to keep the file small."""
+    a, sh = _hex(accent), _hex(shade)
     cols = max((len(r) for r in rows), default=0)
 
-    # sub[y][x] = color hex or None, where each char row spans two sub-rows.
+    # sub[y][x] = "A" (accent) | "S" (shade) | None (empty); each char row = 2 sub-rows.
     sub: list[list[str | None]] = []
     for line in rows:
         top: list[str | None] = []
         bot: list[str | None] = []
         for ch in line.ljust(cols):
             if ch == "█":
-                t, b = a, a
+                t, b = "A", "A"
             elif ch == "▀":
-                t, b = a, None
+                t, b = "A", None
             elif ch == "▄":
-                t, b = None, a
+                t, b = None, "A"
             elif ch in "░▒":
-                t, b = s, s
+                t, b = "S", "S"
             elif ch == " ":
                 t, b = None, None
             else:
-                t, b = a, a
+                t, b = "A", "A"
             top.append(t)
             bot.append(b)
         sub.append(top)
@@ -157,16 +161,18 @@ def render_svg(
     for y, srow in enumerate(sub):
         x = 0
         while x < cols:
-            color = srow[x]
-            if color is None:
+            kind = srow[x]
+            if kind is None:
                 x += 1
                 continue
             run = 1
-            while x + run < cols and srow[x + run] == color:
+            while x + run < cols and srow[x + run] == kind:
                 run += 1
+            fill = a if kind == "A" else sh
+            op = "" if kind == "A" else f' fill-opacity="{opacity:g}"'
             rects.append(
                 f'<rect x="{padding + x * scale}" y="{padding + y * scale}" '
-                f'width="{run * scale}" height="{scale}" fill="{color}"/>'
+                f'width="{run * scale}" height="{scale}" fill="{fill}"{op}/>'
             )
             x += run
 
@@ -217,7 +223,10 @@ def main() -> None:
         "--bg", default=DEFAULT_BG, help='background hex or "transparent" (default: #1a1a1a)'
     )
     ap.add_argument(
-        "--shade", type=float, default=0.42, help="░ density toward accent, 0..1 (default: 0.42)"
+        "--shade",
+        type=float,
+        default=0.8,
+        help="opacity of the darkened two-tone (░) cells, 0..1 (1.0 = opaque; default: 0.8)",
     )
     ap.add_argument(
         "--duration", type=int, default=500, help="ms per GIF frame (default: 500, matches the TUI)"
@@ -229,8 +238,18 @@ def main() -> None:
     transparent = args.bg.lower() == "transparent"
     bg = None if transparent else hex_rgb(args.bg)
     accent = hex_rgb(ACCENT)
-    shade_bg = bg if bg is not None else (0, 0, 0)
-    shade = blend(shade_bg, accent, args.shade)
+    alpha = max(0.0, min(1.0, args.shade))
+
+    # The two-tone cells are a darkened accent at `alpha`. PNG/SVG carry real alpha so
+    # they adapt to any background (deeper on dark, softer on white); GIF has no partial
+    # alpha, so its shade is baked toward white (the page color on PyPI).
+    shade_color = blend((0, 0, 0), accent, SHADE_DARKEN)
+    if bg is None:  # transparent
+        shade_rgba = (*shade_color, round(255 * alpha))
+        shade_solid = blend((255, 255, 255), shade_color, alpha)
+    else:
+        shade_rgba = (*blend(bg, shade_color, alpha), 255)
+        shade_solid = blend(bg, shade_color, alpha)
 
     svg = args.svg or (args.output is not None and args.output.lower().endswith(".svg"))
     default_name = (
@@ -240,19 +259,21 @@ def main() -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
 
     if svg:
-        markup = render_svg(frame_lines(0), args.scale, args.padding, bg, accent, shade)
+        markup = render_svg(
+            frame_lines(0), args.scale, args.padding, bg, accent, shade_color, alpha
+        )
         out.write_text(markup)
         print(f"Wrote {out}  ({len(markup)} bytes)")
         return
 
     if not args.gif:
-        img = render_frame(frame_lines(0), args.scale, args.padding, bg, accent, shade)
+        img = render_frame(frame_lines(0), args.scale, args.padding, bg, accent, shade_rgba)
         img.save(out)
         print(f"Wrote {out}  ({img.width}x{img.height})")
         return
 
     frames = [
-        render_frame(frame_lines(i), args.scale, args.padding, bg, accent, shade)
+        render_frame(frame_lines(i), args.scale, args.padding, bg, accent, (*shade_solid, 255))
         for i in range(len(_FRAMES))
     ]
     if args.frames_dir:
@@ -265,7 +286,7 @@ def main() -> None:
     if transparent:
         # 1-bit transparent GIF: palette index 0 is the transparent slot; disposal=2
         # clears each frame back to transparent so the floating ghost leaves no trail.
-        idx = [_to_indexed(f, accent, shade) for f in frames]
+        idx = [_to_indexed(f, accent, shade_solid) for f in frames]
         idx[0].save(
             out,
             save_all=True,
