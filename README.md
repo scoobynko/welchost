@@ -1,6 +1,6 @@
 # 💀 Welchost
 
-> **welc**ome + g**host** — a macOS CLI that creates and manages a welcome screen for the [Ghostty](https://ghostty.org) terminal.
+> A macOS CLI that creates and manages a welcome screen for the [Ghostty](https://ghostty.org) terminal.
 
 Welchost generates a banner that greets you every time you open Ghostty: big
 [pyfiglet](https://github.com/pwaller/pyfiglet) ASCII art, solid colors or
@@ -45,9 +45,9 @@ a new Ghostty window to see it. Re-run `welchost` any time to edit.
 
 Welchost owns three files in `~/.config/ghostty/`:
 
-- `welchost.toml` — your config, the single source of truth
-- `welcome.zsh` — thin shell shim (generated)
-- `welcome_banner.py` — the renderer (generated)
+- `welchost.toml` - your config, the single source of truth
+- `welcome.zsh` - thin shell shim (generated)
+- `welcome_banner.py` - the renderer (generated)
 
 It **never** touches Ghostty's own `config` file, and it injects exactly one
 guarded line into `~/.zshrc` between sentinel markers (backed up before any
@@ -57,7 +57,7 @@ edit). The banner only runs in an interactive Ghostty shell.
 
 Welchost can send an **anonymous, opt-in** launch ping so we can see roughly how
 many people use it. **Nothing is sent unless you say yes** to a one-time prompt
-on first run. It then carries a random UUID and coarse facts only — welchost
+on first run. It then carries a random UUID and coarse facts only - welchost
 version, install method, OS name/version, CPU arch, and Python minor version.
 **No usernames, paths, IP addresses, config contents, or machine fingerprints**,
 the UUID is never tied to a real-person profile, and data is stored in the EU.
@@ -99,7 +99,7 @@ pre-commit install        # ruff + conventional-commit hooks
 ## Develop safely with `--dev`
 
 Add `--dev` (or set `WELCHOST_DEV=1`) to run **fully sandboxed** against
-`./dev-home/` — it never touches your real `~/.config/ghostty/` or `~/.zshrc`,
+`./dev-home/` - it never touches your real `~/.config/ghostty/` or `~/.zshrc`,
 skips the Ghostty check, and enables hot-reload of the TUI.
 
 ```bash
@@ -136,7 +136,7 @@ src/welchost/
 └── templates/     # welcome.zsh.j2, welcome_banner.py.j2
 ```
 
-The full specification lives in [CLAUDE.md](./CLAUDE.md) — read it before making
+The full specification lives in [CLAUDE.md](./CLAUDE.md) - read it before making
 non-trivial changes.
 
 ## Contributing workflow
@@ -148,7 +148,7 @@ non-trivial changes.
 - Keep the core Textual-free; never hardcode paths (use `detect`); all user
   output goes through a Rich `Console`.
 
-## Releases (automated — don't bump versions by hand)
+## Releases (automated - don't bump versions by hand)
 
 On merge to `main`, [python-semantic-release](https://python-semantic-release.readthedocs.io)
 reads the conventional commits, bumps the version (`feat:` → minor, `fix:` →

@@ -50,7 +50,7 @@ class StepConfirm(Vertical):
         # Success: a config now exists — record it and return to the edit menu.
         self.app.adopt_config(self.app.model)
         names = ", ".join(p.name for p in paths.values())
-        self.app.notify(f"Installed {names} — open a new Ghostty window to see it.", timeout=6)
+        self.app.notify(f"Installed {names} - open a new Ghostty window to see it.", timeout=6)
         self._go_home()
 
     def _go_home(self) -> None:

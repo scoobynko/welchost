@@ -136,7 +136,7 @@ class WelchostApp(App):
         from .screens.modals import ConfirmModal
 
         message = (
-            "Share anonymous usage stats? No personal data — just OS, welchost "
+            "Share anonymous usage stats? No personal data - just OS, welchost "
             "version, and launch counts, so we can see how many people use it."
         )
 

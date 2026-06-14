@@ -1,4 +1,4 @@
-# CLAUDE.md — Welchost
+# CLAUDE.md - Welchost
 
 This file is the single source of truth for the Welchost project. It is written
 for a future Claude Code session that has **no prior context**. Read it fully
@@ -8,7 +8,7 @@ before changing anything.
 
 ## 1. What Welchost is
 
-**Welchost** (a pun on **welc**ome + g**host**) is a macOS-only CLI tool that
+**Welchost** is a macOS-only CLI tool that
 creates and manages a welcome banner for the [Ghostty](https://ghostty.org)
 terminal. When you open a Ghostty window, you get a big ASCII-art greeting with
 optional color/gradient, a border, and system info.
@@ -30,16 +30,23 @@ only to add/remove one guarded `source` line. Everything else lives in
 
 Welchost manages `welchost.toml`, `welcome.zsh`, and `welcome_banner.py`. It
 **never** reads, writes, or deletes `~/.config/ghostty/config` or
-`config.ghostty` — those belong to Ghostty.
+`config.ghostty` - those belong to Ghostty.
 
 ### Ghostty / interactive gate
 
 The `.zshrc` line is always gated so the banner only runs in an interactive
-Ghostty shell:
+Ghostty shell, detected robustly (not just `$TERM_PROGRAM`, which wrappers
+overwrite) and **suppressed inside a multiplexer** (`$TMUX`/`$ZELLIJ`) so it
+doesn't reprint on every pane:
 
 ```zsh
-[[ "$TERM_PROGRAM" == "ghostty" && $- == *i* && -r ~/.config/ghostty/welcome.zsh ]] && source ~/.config/ghostty/welcome.zsh
+[[ ( "$TERM_PROGRAM" == "ghostty" || -n "$GHOSTTY_RESOURCES_DIR" || -n "$GHOSTTY_BIN_DIR" || "$TERM" == *ghostty* ) && -z "$TMUX" && -z "$ZELLIJ" && $- == *i* && -r ~/.config/ghostty/welcome.zsh ]] && source ~/.config/ghostty/welcome.zsh
 ```
+
+The `GHOSTTY_RESOURCES_DIR`/`GHOSTTY_BIN_DIR` env vars are exported by Ghostty and
+survive into tmux panes, so they detect Ghostty even when `$TERM_PROGRAM` has been
+rewritten. The same signals back `detect.is_ghostty_terminal()`, and
+`ghostty_installed()` is fail-open (in-terminal OR `which ghostty` OR app bundle).
 
 ---
 
@@ -47,7 +54,7 @@ Ghostty shell:
 
 ```
 welchost/
-├── CLAUDE.md                 # this file — the spec
+├── CLAUDE.md                 # this file - the spec
 ├── pyproject.toml            # packaging, deps, ruff, semantic-release config
 ├── README.md                 # user-facing intro
 ├── LICENSE                   # MIT
@@ -58,7 +65,7 @@ welchost/
 ├── .github/workflows/        # ci.yml, release.yml, pr-check.yml, homebrew-test.yml
 ├── src/welchost/
 │   ├── __init__.py           # __version__ = "x.y.z"  (bumped by semantic-release)
-│   ├── cli.py                # Typer app — the only entry point
+│   ├── cli.py                # Typer app - the only entry point
 │   ├── config.py            # WelchostConfig dataclass + load/save welchost.toml
 │   ├── detect.py            # Ghostty + env detection + DEV-mode path resolution
 │   ├── generator.py         # render templates + .zshrc sentinel inject/remove
@@ -90,28 +97,28 @@ welchost/
 
 ### Role of each module
 
-- **detect.py** — Resolves *where* files go (`get_config_dir()`, `get_zshrc()`)
+- **detect.py** - Resolves *where* files go (`get_config_dir()`, `get_zshrc()`)
   and *whether* Ghostty is present (`ghostty_installed()`). Holds the module-level
-  `DEV_MODE` flag. This is the lowest layer — depends on nothing else in the package.
-- **config.py** — The `WelchostConfig` dataclass mirrors `welchost.toml` exactly.
+  `DEV_MODE` flag. This is the lowest layer - depends on nothing else in the package.
+- **config.py** - The `WelchostConfig` dataclass mirrors `welchost.toml` exactly.
   `load_config()` reads it (returns `None` if absent), `save_config()` writes it.
   Uses `detect.get_config_dir()` for paths. Depends only on detect.
-- **themes.py** — The 12 named themes as plain data, each convertible to a
+- **themes.py** - The 12 named themes as plain data, each convertible to a
   `WelchostConfig`. No I/O.
-- **generator.py** — Renders `welcome.zsh` and `welcome_banner.py` from a config
+- **generator.py** - Renders `welcome.zsh` and `welcome_banner.py` from a config
   via Jinja2, and manages the `~/.zshrc` sentinel block (inject/remove, with
   backup). Uses detect for paths and config for the data. The `reset` logic lives
   here too (remove files + sentinel).
-- **cli.py** — The Typer app. Subcommands `config`, `preview`, `reset`, `doctor`,
+- **cli.py** - The Typer app. Subcommands `config`, `preview`, `reset`, `doctor`,
   `version`. Root callback handles the global `--dev` flag. Importing the TUI is
   deferred (lazy import inside the command) so non-TUI commands stay fast and the
   core has no dependency on Textual.
-- **update.py** — Self-update support (core, no Textual). Checks PyPI for a newer
+- **update.py** - Self-update support (core, no Textual). Checks PyPI for a newer
   release (`latest_version`, fails soft to `None` when offline), compares versions,
   detects the install method (brew/pipx/pip), and resolves/runs the upgrade command.
   On launch the TUI checks in a background thread and, if newer, prompts to update.
-- **telemetry.py** — Anonymous, opt-out usage analytics (core, no Textual).
-  `track_launch()` mints/persists a random UUID in `analytics.json` (a sidecar —
+- **telemetry.py** - Anonymous, opt-out usage analytics (core, no Textual).
+  `track_launch()` mints/persists a random UUID in `analytics.json` (a sidecar -
   **never** in `welchost.toml`, so the config round-trip stays lossless) and POSTs
   an `install`/`launch` event to PostHog. **Opt-in** (GDPR/ePrivacy-safe for EU):
   nothing is sent until the user consents. `is_configured()` = key + non-dev +
@@ -119,7 +126,7 @@ welchost/
   is `unset`; the TUI then shows a consent modal and calls `record_consent()`
   (which persists the decision in `analytics.json` and, on grant, sends the first
   `install`+`launch`). `track_launch()` sends a `launch` only once consent is
-  granted. Fails soft like `update.py`. The PostHog key is **never committed** —
+  granted. Fails soft like `update.py`. The PostHog key is **never committed** -
   it resolves from `WELCHOST_POSTHOG_KEY` env, else a gitignored `_secrets.py`
   that CI bakes into the build at release time (hatchling `artifacts` in the
   global `[tool.hatch.build]` table → both sdist AND wheel, since Homebrew
@@ -129,7 +136,7 @@ welchost/
   `analytics.json`. Both phone-home paths (this + `update.py`) use
   `net.ssl_context()` (certifi-backed) so they work on Pythons without a system
   CA bundle.
-- **tui/** — Textual UI. **Depends on core, never the reverse.** Core modules must
+- **tui/** - Textual UI. **Depends on core, never the reverse.** Core modules must
   never `import` from `welchost.tui`.
 
 ### Dependency direction (strict)
@@ -138,7 +145,7 @@ welchost/
 tui → core (detect, config, themes, generator)
 ```
 
-Never import tui from core. Never hardcode paths — always go through
+Never import tui from core. Never hardcode paths - always go through
 `detect.get_config_dir()` / `detect.get_zshrc()`.
 
 ---
@@ -149,7 +156,7 @@ Never import tui from core. Never hardcode paths — always go through
 |---|---|---|
 | CLI framework | **Typer** | Type-hint based, free `--help`, shell completion, clean callback for `--dev`. |
 | TUI | **Textual** | Full-screen reactive widgets; live preview re-render via reactive attrs. Not `blessed`/`urwid` because reactivity + CSS-like styling make the live-preview wizard tractable. |
-| ASCII art | **pyfiglet** | 428 fonts bundled as a pip dependency — no system `figlet` binary to install, so `brew install welchost` is self-contained. **Never shell out to `figlet`.** |
+| ASCII art | **pyfiglet** | 428 fonts bundled as a pip dependency - no system `figlet` binary to install, so `brew install welchost` is self-contained. **Never shell out to `figlet`.** |
 | Rendering | **Rich** | Colors, panels, per-character gradient via `Color.blend()`. Textual is built on Rich, so the same render code works in TUI preview and in the generated `welcome_banner.py`. |
 | Config format | **TOML** via stdlib `tomllib` (read) + `tomli_w` (write) | `tomllib` is stdlib on 3.11+; `tomli_w` for writing. Human-editable, typed. |
 | Templating | **Jinja2** | Generate `welcome.zsh` and `welcome_banner.py` from config deterministically. |
@@ -159,7 +166,7 @@ Never import tui from core. Never hardcode paths — always go through
 
 ---
 
-## 4. Config schema — `welchost.toml`
+## 4. Config schema - `welchost.toml`
 
 Stored at `~/.config/ghostty/welchost.toml` (or `dev-home/.config/ghostty/` in
 DEV mode). It is the **single source of truth**. `welcome.zsh` and
@@ -216,7 +223,7 @@ created_at = ""          # ISO8601 timestamp set on first save
   power users.
 
 `WelchostConfig` is a dataclass that mirrors this structure (nested dataclasses
-or flat fields — implementer's choice, but round-trip through TOML must be
+or flat fields - implementer's choice, but round-trip through TOML must be
 lossless). Provide a `DEFAULTS`/`WelchostConfig.default()` factory matching the
 above.
 
@@ -245,7 +252,7 @@ sensible default and says so. `doctor` is a **development-only diagnostic**:
 hidden from the user-facing CLI *and* the TUI menus, and it refuses to run
 outside dev mode (`--dev` / `WELCHOST_DEV=1`), exiting non-zero with a message.
 In dev it reports each chain link (Ghostty, env, files, sentinel) as a finding,
-not a crash. All user-facing output goes through a Rich `Console` — **never bare
+not a crash. All user-facing output goes through a Rich `Console` - **never bare
 `print()`**.
 
 ---
@@ -254,6 +261,12 @@ not a crash. All user-facing output goes through a Rich `Console` — **never ba
 
 The TUI has a **fast path** (themes) and a **power path** (custom wizard). Both
 converge on the same confirm screen.
+
+**Ghostty gate (on launch):** if Ghostty isn't installed (and not in dev mode),
+`on_mount` pushes a blocking `GhosttyRequiredModal` over the menu whose only
+action is to quit - there's nothing to configure without Ghostty. The
+update/telemetry pings are skipped in that case. See
+`detect.should_warn_no_ghostty()` and `GHOSTTY_REQUIRED_MESSAGE`.
 
 ```
 welchost
@@ -270,7 +283,7 @@ welchost
 - ── separator ──
 - 👁  preview current  *(only if config exists)*
 - ✏️  edit existing  *(only if config exists)*
-- 🔧 doctor  *(dev mode only — hidden from normal users)*
+- 🔧 doctor  *(dev mode only - hidden from normal users)*
 - 💀 reset
 
 **Theme gallery:** 3-column grid of cards; each card shows a mini pyfiglet
@@ -278,13 +291,13 @@ preview in that theme's font/color. `enter` = use as-is → confirm. `c` =
 customize → wizard pre-populated. `/` or typing = search filter.
 
 **Wizard (4 steps, each with a live preview pane at the bottom):**
-1. **text + font + alignment** — text input, font picker (dropdown Select, curated first + all fonts), screen alignment (left/center/right).
-2. **color** — mode (solid | gradient); a `ColorField` dropdown of named preset
+1. **text + font + alignment** - text input, font picker (dropdown Select, curated first + all fonts), screen alignment (left/center/right).
+2. **color** - mode (solid | gradient); a `ColorField` dropdown of named preset
    colors (each with a swatch) + custom hex; for gradient, start/end fields plus
    a direction picker (horizontal | vertical | diagonal).
-3. **decoration + info** — border style, border color, ornament (flanking ASCII),
+3. **decoration + info** - border style, border color, ornament (flanking ASCII),
    and the two info-widget toggles (user, date/time).
-4. **confirm** — full preview + file diff summary + **save & install**.
+4. **confirm** - full preview + file diff summary + **save & install**.
 
 **Edit menu (config exists):** text & font → step 1 pre-filled; color → step 2;
 decoration & info → step 3; load a theme (replace all); full re-wizard; preview /
@@ -293,19 +306,19 @@ save / discard.
 ### Live preview requirement
 
 Every screen has a `BannerPreview` widget (uses a `render()` override, not
-`update()` — Textual 8.x measures auto-height widgets via the render path) that
+`update()` - Textual 8.x measures auto-height widgets via the render path) that
 re-renders on any input change. It renders the same way `welcome_banner.py` will,
 so what you see is what you get.
 
 ### Keyboard-only navigation (no mouse required)
 
-- No emoji anywhere — pixel/block glyphs only. First screen shows the `Logo`
+- No emoji anywhere - pixel/block glyphs only. First screen shows the `Logo`
   splash: a pixel-art ghost beside a `double_blocky` "welchost" wordmark, a
   `~/welchost ❯` prompt, and the tagline. Menu items use accent block glyphs
   (`▦ ◧ ◈ ▩ …`) as bullets.
 - Menus: `ListView`, focused on mount, `↑/↓` + `enter`.
 - Template picker (`TemplateList`): a single `ListView` of templates with a live
-  `BannerPreview` below — `↑/↓` browses (preview updates live), `enter` opens the
+  `BannerPreview` below - `↑/↓` browses (preview updates live), `enter` opens the
   wizard at step 1 (so text/font stay editable), `esc` back. A vertical list,
   not a grid, so arrow nav is unambiguous.
 - Wizard: step content is Tab-navigable; **`ctrl+←` / `ctrl+→`** change steps
@@ -318,7 +331,7 @@ so what you see is what you get.
 ## 7. The 6 templates
 
 Curated down to a focused set (the original 12 had two invalid pyfiglet font
-names — `3d-diagonal`/`calgames` — and were too many). Filled / block fonts
+names - `3d-diagonal`/`calgames` - and were too many). Filled / block fonts
 lead, matching the Claude / Codex CLI aesthetic. Brand accent is terracotta
 `#d97757` (matches jakubsalmik.com).
 
@@ -329,7 +342,7 @@ lead, matching the Claude / Codex CLI aesthetic. Brand accent is terracotta
 | ghost | slant | cyan | magenta | panel |
 | matrix | ansi_regular | bright_green | green | none |
 | sunset | slant | gradient #ff6b35 → #f7c59f | #ff6b35 | panel |
-| mono | pagga | white | — | none |
+| mono | pagga | white | - | none |
 
 `sunset` uses `color_mode = "gradient"`; all others are `solid`. Each template
 maps to a full `WelchostConfig` and carries a short `blurb`. Every font name must
@@ -338,7 +351,7 @@ curated font list is validated by `tests/test_generator.py`.
 
 ### Curated font shortlist (for the wizard picker)
 
-Filled first, then classics — all verified valid:
+Filled first, then classics - all verified valid:
 
 ```
 ansi_shadow, ansi_regular, pagga, block, banner3, colossal, slant, doom, big,
@@ -356,9 +369,9 @@ Gradient is per-character RGB interpolation between `gradient.start` and
 `gradient.end`. Each character's blend factor `f ∈ [0, 1]` comes from its
 position in the **whole art block**, per `gradient.direction`:
 
-- `horizontal` — `f = col / (maxwidth - 1)` (left→right across each line; the default).
-- `vertical` — `f = row / (rows - 1)` (top→bottom; each line is one solid blend).
-- `diagonal` — `f = (col/(maxwidth-1) + row/(rows-1)) / 2` (top-left→bottom-right).
+- `horizontal` - `f = col / (maxwidth - 1)` (left→right across each line; the default).
+- `vertical` - `f = row / (rows - 1)` (top→bottom; each line is one solid blend).
+- `diagonal` - `f = (col/(maxwidth-1) + row/(rows-1)) / 2` (top-left→bottom-right).
 
 ```python
 def factor(col, row, dx, dy, direction):  # dx = maxwidth-1, dy = rows-1
@@ -372,7 +385,7 @@ def factor(col, row, dx, dy, direction):  # dx = maxwidth-1, dy = rows-1
 This identical logic lives in both the TUI/CLI preview (`render.py`,
 `render_art` → `_gradient_factor`) and the generated `welcome_banner.py`
 (`colorize_line` → `_factor`), so the preview is WYSIWYG. The dimensions
-(`maxwidth`, `rows`) are taken from the art block only — info lines stay plain.
+(`maxwidth`, `rows`) are taken from the art block only - info lines stay plain.
 Solid mode just applies one style to the whole block.
 
 ---
@@ -383,7 +396,7 @@ Always use sentinel markers, never double-inject, always back up first.
 
 ```zsh
 # >>> welchost >>>
-[[ "$TERM_PROGRAM" == "ghostty" && $- == *i* && -r ~/.config/ghostty/welcome.zsh ]] && source ~/.config/ghostty/welcome.zsh
+[[ ( "$TERM_PROGRAM" == "ghostty" || -n "$GHOSTTY_RESOURCES_DIR" || -n "$GHOSTTY_BIN_DIR" || "$TERM" == *ghostty* ) && -z "$TMUX" && -z "$ZELLIJ" && $- == *i* && -r ~/.config/ghostty/welcome.zsh ]] && source ~/.config/ghostty/welcome.zsh
 # <<< welchost <<<
 ```
 
@@ -391,7 +404,7 @@ Rules:
 - **Backup** before any edit: `~/.zshrc.welchost.bak.<timestamp>`.
 - **Idempotent**: if the sentinel block already exists, replace its contents
   rather than appending a second block. Detect by the marker lines.
-- **Never blindly append** — always scan for the start marker first.
+- **Never blindly append** - always scan for the start marker first.
 - **Reset** removes everything between the markers (inclusive), leaving the rest
   of `~/.zshrc` untouched.
 - If `~/.zshrc` doesn't exist, create it.
@@ -407,14 +420,14 @@ Just runs the renderer; no logic. Roughly:
 
 ```zsh
 #!/usr/bin/env zsh
-# Generated by welchost — do not edit. Edit welchost.toml and regenerate.
+# Generated by welchost - do not edit. Edit welchost.toml and regenerate.
 python3 "${HOME}/.config/ghostty/welcome_banner.py"
 ```
 
 ### `welcome_banner.py` (the renderer)
 
 A standalone Python script (depends only on Rich, which the user has via the
-installed welchost venv — or guard the import) that:
+installed welchost venv - or guard the import) that:
 - Builds the pyfiglet text from `banner.text` / `banner.font` (native size).
 - Applies solid color or per-character gradient (the `render_gradient` pattern).
 - Wraps in the chosen border (`panel`/`box`/`double`/`rounded`/`ascii`/`none`)
@@ -427,7 +440,7 @@ installed welchost venv — or guard the import) that:
 
 Both files are rendered from Jinja2 templates in `src/welchost/templates/` with
 the config values baked in. **Users must never edit `welcome_banner.py`
-directly** — it is regenerated from `welchost.toml`.
+directly** - it is regenerated from `welchost.toml`.
 
 ---
 
@@ -440,7 +453,7 @@ Activation (all equivalent): `welchost --dev <cmd>`, `welchost <cmd> --dev`,
 |---|---|---|
 | Config dir | `~/.config/ghostty/` | `./dev-home/.config/ghostty/` |
 | `.zshrc` target | `~/.zshrc` | `./dev-home/.zshrc` |
-| Ghostty check | required (warn if missing) | skipped (`ghostty_installed()` → True) |
+| Ghostty check | required (TUI blocks with a quit-only modal if missing; `preview` prints a note) | skipped (`ghostty_installed()` → True) |
 | TUI | Textual app | Textual app + (optional) textual console |
 | File watcher | off | watchdog watches `src/welchost/` |
 | Reset scope | real files | wipes `./dev-home/` only |
@@ -471,21 +484,21 @@ def ghostty_installed() -> bool:
 ```
 
 Hot reload (`tui/dev_watcher.py`) is only imported/started when `DEV_MODE` is
-True — never in production.
+True - never in production.
 
 ---
 
 ## 12. What NOT to do (hard constraints)
 
 - ❌ Never touch `~/.config/ghostty/config` or `config.ghostty`.
-- ❌ Never call the system `figlet` binary — always pyfiglet.
-- ❌ Never blindly append to `~/.zshrc` — check the sentinel first.
-- ❌ Never assume `~/.config/ghostty/` exists — always `mkdir -p`.
-- ❌ Never let users edit `welcome_banner.py` directly — it is generated.
+- ❌ Never call the system `figlet` binary - always pyfiglet.
+- ❌ Never blindly append to `~/.zshrc` - check the sentinel first.
+- ❌ Never assume `~/.config/ghostty/` exists - always `mkdir -p`.
+- ❌ Never let users edit `welcome_banner.py` directly - it is generated.
 - ❌ Never ship a prebuilt binary.
 - ❌ Never import `welchost.tui` from a core module.
-- ❌ Never hardcode `~`/paths — use `detect.get_config_dir()` / `get_zshrc()`.
-- ❌ Never use bare `print()` for user output — use a Rich `Console`.
+- ❌ Never hardcode `~`/paths - use `detect.get_config_dir()` / `get_zshrc()`.
+- ❌ Never use bare `print()` for user output - use a Rich `Console`.
 
 ---
 
@@ -493,20 +506,20 @@ True — never in production.
 
 Run: `pip install -e ".[dev]" && pytest`.
 
-- **conftest.py** — `fake_home` fixture monkeypatches `HOME` + `XDG_CONFIG_HOME`
+- **conftest.py** - `fake_home` fixture monkeypatches `HOME` + `XDG_CONFIG_HOME`
   to a tmp dir so no test touches the real home. A separate path for DEV-mode
   tests (cwd-relative `dev-home/`).
-- **test_cli.py** — every command via `typer.testing.CliRunner` (`version`,
+- **test_cli.py** - every command via `typer.testing.CliRunner` (`version`,
   `doctor`, `preview`, `reset` with confirm, `--dev` variants).
-- **test_config.py** — `load_config` (missing → None), `save_config`, lossless
+- **test_config.py** - `load_config` (missing → None), `save_config`, lossless
   round-trip, defaults.
-- **test_generator.py** — files generated with expected content; `.zshrc`
+- **test_generator.py** - files generated with expected content; `.zshrc`
   sentinel **idempotency** (inject twice → one block); backup created; reset
   removes files + sentinel only.
-- **test_detect.py** — Ghostty detection; DEV vs normal path resolution.
-- **test_dev_mode.py** — `--dev` writes to `dev-home/` not `~`; `--dev reset`
+- **test_detect.py** - Ghostty detection; DEV vs normal path resolution.
+- **test_dev_mode.py** - `--dev` writes to `dev-home/` not `~`; `--dev reset`
   wipes `dev-home/` only; `dev-home/` auto-created; `ghostty_installed()` True in DEV.
-- **test_themes.py** — all 12 themes load and every font name is a valid pyfiglet
+- **test_themes.py** - all 12 themes load and every font name is a valid pyfiglet
   font.
 
 Key invariants to protect: sentinel idempotency, DEV isolation, lossless config
@@ -535,15 +548,15 @@ refactor perf ci build`. Enforced by commitlint in CI + `conventional-pre-commit
 locally.
 
 Workflows (`.github/workflows/`):
-- **ci.yml** — lint + ruff format check + pytest matrix (3.11/3.12/3.13) + commit lint on PRs.
-- **release.yml** — on push to main: test → semantic-release → PyPI publish →
+- **ci.yml** - lint + ruff format check + pytest matrix (3.11/3.12/3.13) + commit lint on PRs.
+- **release.yml** - on push to main: test → semantic-release → PyPI publish →
   bump Homebrew formula.
-- **pr-check.yml** — commit-message + PR-title conventional-commit validation.
-- **homebrew-test.yml** — on release: `brew install` smoke test.
+- **pr-check.yml** - commit-message + PR-title conventional-commit validation.
+- **homebrew-test.yml** - on release: `brew install` smoke test.
 
 Required GitHub secrets: `PYPI_TOKEN`, `HOMEBREW_TAP_TOKEN` (PAT, repo+workflow
 on the tap repo), `WELCHOST_POSTHOG_KEY` (PostHog project key, baked into the
-build at release time — release.yml skips the bake step when unset, so telemetry
+build at release time - release.yml skips the bake step when unset, so telemetry
 just stays off). `GITHUB_TOKEN` is automatic. `main` is branch-protected
 (require PR + CI checks, no bypass).
 
