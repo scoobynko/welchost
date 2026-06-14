@@ -28,6 +28,7 @@ dependencies = [
     "pyfiglet>=1.0",
     "jinja2>=3.1",
     "tomli-w>=1.0",
+    "certifi>=2023.7",
 ]
 
 [project.optional-dependencies]
@@ -52,6 +53,15 @@ Issues = "https://github.com/scoobynko/welchost/issues"
 [project.scripts]
 welchost = "welchost.cli:app"
 
+
+[tool.hatch.build]
+# _secrets.py is .gitignored (it holds the CI-injected PostHog key), but
+# hatchling honors .gitignore — so force it into the build when CI has written it.
+# This MUST live in the global [tool.hatch.build] table (not under targets.wheel)
+# so it applies to BOTH the wheel AND the sdist: Homebrew installs from the sdist,
+# so a wheel-only artifact would leave brew users with no key. Absent in a normal
+# checkout, this glob simply matches nothing.
+artifacts = ["src/welchost/_secrets.py"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/welchost"]

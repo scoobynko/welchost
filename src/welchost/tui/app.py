@@ -51,10 +51,13 @@ class WelchostApp(App):
         else:
             self.push_screen(MainMenu())
 
-        # Check PyPI for a newer release and offer to update. Skipped in dev
-        # mode (don't nag while hacking on the tool itself).
+        # Check PyPI for a newer release and offer to update (skipped in dev — no
+        # nagging while hacking). Telemetry does its own gating (dev/key/consent),
+        # so call it unconditionally; it no-ops in dev unless WELCHOST_TELEMETRY_FORCE
+        # is set, the hatch that lets the opt-in prompt be exercised in dev.
         if not detect.is_dev():
             self._check_for_update()
+        self._send_telemetry()
 
     # --- self-update -----------------------------------------------------------
     # On launch, check PyPI in a background thread (so the network call never
@@ -103,6 +106,40 @@ class WelchostApp(App):
                 severity="error",
                 timeout=10,
             )
+
+    # --- telemetry -----------------------------------------------------------
+    # Opt-in usage analytics (no PII). On first run we prompt for consent in a
+    # modal; nothing is sent until the user agrees. After that, each launch sends
+    # one anonymous ping from a background thread so it never blocks the UI.
+    # Disabled without a key, in dev mode, or via WELCHOST_NO_TELEMETRY / DO_NOT_TRACK.
+
+    @work(thread=True, exclusive=True, group="telemetry")
+    def _send_telemetry(self) -> None:
+        from ..telemetry import needs_consent_prompt, track_launch
+
+        if needs_consent_prompt():
+            self.call_from_thread(self._prompt_consent)
+        else:
+            track_launch()
+
+    def _prompt_consent(self) -> None:
+        from .screens.modals import ConfirmModal
+
+        message = (
+            "Share anonymous usage stats? No personal data — just OS, welchost "
+            "version, and launch counts, so we can see how many people use it."
+        )
+
+        def on_result(confirmed: bool | None) -> None:
+            self._record_consent(bool(confirmed))
+
+        self.push_screen(ConfirmModal(message, yes_label="share", no_label="no thanks"), on_result)
+
+    @work(thread=True, exclusive=True, group="telemetry-consent")
+    def _record_consent(self, granted: bool) -> None:
+        from ..telemetry import record_consent
+
+        record_consent(granted)
 
     # --- config lifecycle ----------------------------------------------------
     # `model` is the working config; `had_config` tracks whether a config exists

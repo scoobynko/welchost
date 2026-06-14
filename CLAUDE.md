@@ -110,6 +110,25 @@ welchost/
   release (`latest_version`, fails soft to `None` when offline), compares versions,
   detects the install method (brew/pipx/pip), and resolves/runs the upgrade command.
   On launch the TUI checks in a background thread and, if newer, prompts to update.
+- **telemetry.py** — Anonymous, opt-out usage analytics (core, no Textual).
+  `track_launch()` mints/persists a random UUID in `analytics.json` (a sidecar —
+  **never** in `welchost.toml`, so the config round-trip stays lossless) and POSTs
+  an `install`/`launch` event to PostHog. **Opt-in** (GDPR/ePrivacy-safe for EU):
+  nothing is sent until the user consents. `is_configured()` = key + non-dev +
+  no opt-out env; `needs_consent_prompt()` is true when configured but the choice
+  is `unset`; the TUI then shows a consent modal and calls `record_consent()`
+  (which persists the decision in `analytics.json` and, on grant, sends the first
+  `install`+`launch`). `track_launch()` sends a `launch` only once consent is
+  granted. Fails soft like `update.py`. The PostHog key is **never committed** —
+  it resolves from `WELCHOST_POSTHOG_KEY` env, else a gitignored `_secrets.py`
+  that CI bakes into the build at release time (hatchling `artifacts` in the
+  global `[tool.hatch.build]` table → both sdist AND wheel, since Homebrew
+  installs from the sdist). A plain checkout has no key → no-op. Also disabled in
+  DEV mode (unless `WELCHOST_TELEMETRY_FORCE=1`, a hatch for testing the prompt)
+  or via `WELCHOST_NO_TELEMETRY` / `DO_NOT_TRACK`. `reset` removes
+  `analytics.json`. Both phone-home paths (this + `update.py`) use
+  `net.ssl_context()` (certifi-backed) so they work on Pythons without a system
+  CA bundle.
 - **tui/** — Textual UI. **Depends on core, never the reverse.** Core modules must
   never `import` from `welchost.tui`.
 
@@ -523,7 +542,9 @@ Workflows (`.github/workflows/`):
 - **homebrew-test.yml** — on release: `brew install` smoke test.
 
 Required GitHub secrets: `PYPI_TOKEN`, `HOMEBREW_TAP_TOKEN` (PAT, repo+workflow
-on the tap repo). `GITHUB_TOKEN` is automatic. `main` is branch-protected
+on the tap repo), `WELCHOST_POSTHOG_KEY` (PostHog project key, baked into the
+build at release time — release.yml skips the bake step when unset, so telemetry
+just stays off). `GITHUB_TOKEN` is automatic. `main` is branch-protected
 (require PR + CI checks, no bypass).
 
 ---

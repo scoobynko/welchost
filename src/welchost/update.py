@@ -15,7 +15,7 @@ import sys
 import urllib.request
 from pathlib import Path
 
-from . import __version__
+from . import __version__, net
 
 PYPI_JSON = "https://pypi.org/pypi/welchost/json"
 
@@ -28,7 +28,7 @@ def latest_version(timeout: float = 2.0) -> str | None:
     """Latest welchost version on PyPI, or ``None`` on any failure (offline,
     timeout, malformed response). Never raises."""
     try:
-        with urllib.request.urlopen(PYPI_JSON, timeout=timeout) as resp:  # noqa: S310
+        with urllib.request.urlopen(PYPI_JSON, timeout=timeout, context=net.ssl_context()) as resp:  # noqa: S310
             data = json.load(resp)
         version = data["info"]["version"]
         return version if isinstance(version, str) else None
