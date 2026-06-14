@@ -1,6 +1,12 @@
-# 💀 Welchost
+<p align="center">
+  <img src="https://raw.githubusercontent.com/scoobynko/welchost/main/assets/welchost-logo.gif" alt="Welchost" width="620">
+</p>
 
-> A macOS CLI that creates and manages a welcome screen for the [Ghostty](https://ghostty.org) terminal.
+<h1 align="center">Welchost</h1>
+
+<p align="center">
+  A macOS CLI that creates and manages a welcome screen for the <a href="https://ghostty.org">Ghostty</a> terminal.
+</p>
 
 Welchost generates a banner that greets you every time you open Ghostty: big
 [pyfiglet](https://github.com/pwaller/pyfiglet) ASCII art, solid colors or
