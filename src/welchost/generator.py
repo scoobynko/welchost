@@ -323,6 +323,7 @@ def reset() -> list[Path]:
         detect.get_config_path(),
         detect.get_welcome_zsh_path(),
         detect.get_welcome_banner_path(),
+        detect.get_analytics_path(),
     ):
         if p.exists():
             p.unlink()

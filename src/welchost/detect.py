@@ -58,6 +58,11 @@ def get_welcome_banner_path() -> Path:
     return get_config_dir() / "welcome_banner.py"
 
 
+def get_analytics_path() -> Path:
+    """Sidecar file holding the anonymous telemetry id (not part of the config)."""
+    return get_config_dir() / "analytics.json"
+
+
 def ensure_config_dir() -> Path:
     """Create the config dir if needed and return it."""
     d = get_config_dir()

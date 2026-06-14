@@ -14,6 +14,9 @@ venv/
 dev-home/
 *.welchost.bak*
 
+# Telemetry key, baked into the published artifact by CI — never committed.
+src/welchost/_secrets.py
+
 # Tooling
 .pytest_cache/
 .ruff_cache/

@@ -53,6 +53,25 @@ It **never** touches Ghostty's own `config` file, and it injects exactly one
 guarded line into `~/.zshrc` between sentinel markers (backed up before any
 edit). The banner only runs in an interactive Ghostty shell.
 
+## Privacy
+
+Welchost can send an **anonymous, opt-in** launch ping so we can see roughly how
+many people use it. **Nothing is sent unless you say yes** to a one-time prompt
+on first run. It then carries a random UUID and coarse facts only — welchost
+version, install method, OS name/version, CPU arch, and Python minor version.
+**No usernames, paths, IP addresses, config contents, or machine fingerprints**,
+the UUID is never tied to a real-person profile, and data is stored in the EU.
+
+If you opted in and change your mind, the ping is skipped when either is set:
+
+```bash
+export WELCHOST_NO_TELEMETRY=1   # welchost-specific opt-out
+export DO_NOT_TRACK=1            # the cross-tool standard (consoledonottrack.com)
+```
+
+The anonymous id and your choice live in `~/.config/ghostty/analytics.json` and
+are removed by `welchost reset`. Telemetry is also off entirely in `--dev` mode.
+
 ## Uninstall
 
 ```bash
