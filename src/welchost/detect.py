@@ -22,6 +22,22 @@ DEV_MODE: bool = False
 # Sandbox root for DEV mode, relative to the current working directory.
 DEV_HOME = Path("dev-home")
 
+# Shown by the non-interactive `preview` command when Ghostty isn't installed.
+# Informational only — preview still renders the banner to stdout.
+GHOSTTY_MISSING_NOTICE = (
+    "Ghostty isn't installed - the welcome banner only shows in a Ghostty "
+    "terminal. Install it from https://ghostty.org, then it'll appear automatically."
+)
+
+# Shown by the TUI's blocking gate when Ghostty is missing. There's nothing to
+# configure without Ghostty, so the modal offers a single action: quit.
+GHOSTTY_REQUIRED_MESSAGE = (
+    "Welchost needs Ghostty.\n\n"
+    "It builds a welcome screen for the Ghostty terminal, so there's nothing to "
+    "set up until Ghostty is installed.\n\n"
+    "Install it from https://ghostty.org, then relaunch welchost."
+)
+
 
 def is_dev() -> bool:
     """True if DEV mode is active, honoring the env var as a fallback."""
@@ -70,15 +86,40 @@ def ensure_config_dir() -> Path:
     return d
 
 
+def _ghostty_app_present() -> bool:
+    """True if a Ghostty install is found on disk (app bundle or known binary)."""
+    candidates = (
+        Path("/Applications/Ghostty.app"),
+        Path("~/Applications/Ghostty.app").expanduser(),
+        Path("/opt/homebrew/bin/ghostty"),  # Homebrew on Apple Silicon
+        Path("/usr/local/bin/ghostty"),  # Homebrew on Intel
+        Path("/run/current-system/sw/bin/ghostty"),  # Nix
+    )
+    return any(p.exists() for p in candidates)
+
+
 def ghostty_installed() -> bool:
-    """True if Ghostty is installed. Always True in DEV mode (check skipped)."""
+    """True if Ghostty is available. Always True in DEV mode (check skipped).
+
+    Detection is deliberately fail-open: a false negative now hard-blocks the TUI
+    (see the launch gate), so we accept several independent signals. Crucially, if
+    we're already running inside a Ghostty session it counts as installed — this
+    covers libghostty-based terminals that ship no ``Ghostty.app`` bundle.
+    """
     if is_dev():
         return True
-    return (
-        Path("/Applications/Ghostty.app").exists()
-        or Path("~/Applications/Ghostty.app").expanduser().exists()
-        or shutil.which("ghostty") is not None
-    )
+    return is_ghostty_terminal() or shutil.which("ghostty") is not None or _ghostty_app_present()
+
+
+def should_warn_no_ghostty() -> bool:
+    """True if the user should be warned that Ghostty is missing.
+
+    Detection is fail-open (see :func:`ghostty_installed`); the generated
+    ``.zshrc`` gate is itself guarded on the Ghostty env signals, so the banner
+    just stays dormant until Ghostty is present. Never warns in DEV mode (where
+    ``ghostty_installed()`` is forced True anyway).
+    """
+    return not is_dev() and not ghostty_installed()
 
 
 def term_program() -> str | None:
@@ -87,5 +128,17 @@ def term_program() -> str | None:
 
 
 def is_ghostty_terminal() -> bool:
-    """True if the current terminal reports itself as Ghostty."""
-    return term_program() == "ghostty"
+    """True if the current shell is running inside Ghostty.
+
+    ``$TERM_PROGRAM`` alone is fragile — multiplexers (tmux/zellij) and other
+    wrappers overwrite it. So we also accept the env vars Ghostty exports
+    (``GHOSTTY_RESOURCES_DIR``/``GHOSTTY_BIN_DIR``, which notably survive into tmux
+    panes) and its shipped terminfo entry (``TERM=…ghostty``).
+    """
+    env = os.environ
+    return (
+        env.get("TERM_PROGRAM") == "ghostty"
+        or bool(env.get("GHOSTTY_RESOURCES_DIR"))
+        or bool(env.get("GHOSTTY_BIN_DIR"))
+        or env.get("TERM", "").endswith("ghostty")
+    )

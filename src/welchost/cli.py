@@ -37,7 +37,7 @@ def main(
         False, "--dev", help="Run sandboxed against ./dev-home/ (never touches ~)."
     ),
 ) -> None:
-    """Welchost — a welcome screen for Ghostty."""
+    """Welchost - a welcome screen for Ghostty."""
     if dev or detect.is_dev():
         _enable_dev()
     # Bare `welchost` (no subcommand) launches the TUI, same as `config`.
@@ -72,6 +72,8 @@ def preview() -> None:
         )
         cfg = WelchostConfig.default()
     console.print(render_banner(cfg))
+    if detect.should_warn_no_ghostty():
+        console.print(f"[yellow]Note:[/yellow] {detect.GHOSTTY_MISSING_NOTICE}")
 
 
 @app.command()
@@ -119,7 +121,7 @@ def doctor() -> None:
         mark = "[green]✓[/green]" if ok else "[red]✗[/red]"
         table.add_row(name, mark, detail)
 
-    console.print("[yellow]DEV mode[/yellow] — sandboxed at ./dev-home/")
+    console.print("[yellow]DEV mode[/yellow] - sandboxed at ./dev-home/")
 
     row(
         "Ghostty installed",

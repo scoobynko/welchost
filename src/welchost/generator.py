@@ -230,9 +230,20 @@ def _sentinel_block() -> str:
             src = f"~/{rel}"
         except ValueError:
             src = str(welcome)
-    # Gate: interactive Ghostty shells only, and only if the shim is still there
-    # (the `-r` guard means a deleted welcome.zsh can't error on every prompt).
-    line = f'[[ "$TERM_PROGRAM" == "ghostty" && $- == *i* && -r {src} ]] && source {src}'
+    # Gate, left→right:
+    #   - Ghostty detected by any robust signal ($TERM_PROGRAM, the GHOSTTY_* env
+    #     vars it exports, or its terminfo) — not just $TERM_PROGRAM, which wrappers
+    #     overwrite.
+    #   - NOT inside a multiplexer ($TMUX/$ZELLIJ), so the banner doesn't reprint on
+    #     every new tmux/zellij pane.
+    #   - interactive shell only ($- == *i*).
+    #   - the shim still exists (`-r` guard: a deleted welcome.zsh can't error every
+    #     prompt).
+    ghostty = (
+        '( "$TERM_PROGRAM" == "ghostty" || -n "$GHOSTTY_RESOURCES_DIR" '
+        '|| -n "$GHOSTTY_BIN_DIR" || "$TERM" == *ghostty* )'
+    )
+    line = f'[[ {ghostty} && -z "$TMUX" && -z "$ZELLIJ" && $- == *i* && -r {src} ]] && source {src}'
     return f"{SENTINEL_START}\n{line}\n{SENTINEL_END}\n"
 
 

@@ -59,6 +59,11 @@ def test_sentinel_contents(fake_home):
     text = detect.get_zshrc().read_text()
     assert 'TERM_PROGRAM" == "ghostty"' in text
     assert "$- == *i*" in text
+    # Robust Ghostty detection beyond TERM_PROGRAM (survives wrappers)…
+    assert "GHOSTTY_RESOURCES_DIR" in text
+    # …but suppressed inside a multiplexer so it doesn't reprint per pane.
+    assert '-z "$TMUX"' in text
+    assert '-z "$ZELLIJ"' in text
 
 
 def test_inject_preserves_existing_content(fake_home):

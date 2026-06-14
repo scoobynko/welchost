@@ -92,7 +92,7 @@ class _Menu(Screen):
             self.app.clear_config()
             if removed:
                 names = ", ".join(p.name for p in removed)
-                self.app.notify(f"{done_label} — removed {names}.", timeout=6)
+                self.app.notify(f"{done_label} - removed {names}.", timeout=6)
             else:
                 self.app.notify("Nothing to remove.", timeout=6)
             self.app.switch_screen(MainMenu())
@@ -282,7 +282,7 @@ class DoctorScreen(Screen):
 
         lines = ["[bold]welchost doctor[/bold]\n"]
         if detect.is_dev():
-            lines.append("[yellow]DEV mode[/yellow] — sandboxed at ./dev-home/\n")
+            lines.append("[yellow]DEV mode[/yellow] - sandboxed at ./dev-home/\n")
         lines.append(f"{mark(detect.ghostty_installed())} Ghostty installed")
         lines.append(f"{mark(detect.is_ghostty_terminal())} TERM_PROGRAM=ghostty")
         lines.append(f"{mark(detect.get_config_path().exists())} welchost.toml exists")

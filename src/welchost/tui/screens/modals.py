@@ -39,7 +39,7 @@ class ConfirmModal(ModalScreen[bool]):
     ConfirmModal { align: center middle; background: $background; }
     ConfirmModal #modal-box {
         width: 60; max-width: 90%; height: auto; padding: 1 2;
-        border: round $panel; background: $surface;
+        border: none; background: $surface;
     }
     ConfirmModal #modal-msg { padding: 0 0 1 0; }
     ConfirmModal #modal-buttons { height: auto; text-align: center; padding: 1 0 0 0; }
@@ -82,3 +82,45 @@ class ConfirmModal(ModalScreen[bool]):
 
     def action_choose(self, value: bool) -> None:
         self.dismiss(value)
+
+
+class GhosttyRequiredModal(ModalScreen[None]):
+    """A blocking gate shown when Ghostty isn't installed.
+
+    Welchost configures a *Ghostty* banner, so without Ghostty there is nothing to
+    do. This modal cannot be dismissed back to the menu — its single action is to
+    quit: ``enter``, ``q``, and ``escape`` all exit the app.
+    """
+
+    BINDINGS = [
+        ("enter", "quit", "Quit"),
+        ("q", "quit", "Quit"),
+        ("escape", "quit", "Quit"),
+    ]
+
+    CSS = """
+    /* Opaque backdrop so the menu beneath is fully hidden — this is a dead end. */
+    GhosttyRequiredModal { align: center middle; background: $background; }
+    GhosttyRequiredModal #modal-box {
+        width: 60; max-width: 90%; height: auto; padding: 1 2;
+        border: none; background: $surface;
+    }
+    GhosttyRequiredModal #modal-msg { padding: 0 0 1 0; }
+    GhosttyRequiredModal #modal-buttons { height: auto; text-align: center; padding: 1 0 0 0; }
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__()
+        self._message = message
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="modal-box"):
+            yield Static(self._message, id="modal-msg")
+            yield Static(self._button(), id="modal-buttons")
+
+    def _button(self) -> Text:
+        # Text (not markup) so the literal [ ] brackets render verbatim.
+        return Text("[ quit welchost ]", style=f"bold {ACCENT}", justify="center")
+
+    def action_quit(self) -> None:
+        self.app.exit()
