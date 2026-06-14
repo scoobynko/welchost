@@ -22,6 +22,22 @@ DEV_MODE: bool = False
 # Sandbox root for DEV mode, relative to the current working directory.
 DEV_HOME = Path("dev-home")
 
+# Shown by the non-interactive `preview` command when Ghostty isn't installed.
+# Informational only — preview still renders the banner to stdout.
+GHOSTTY_MISSING_NOTICE = (
+    "Ghostty isn't installed - the welcome banner only shows in a Ghostty "
+    "terminal. Install it from https://ghostty.org, then it'll appear automatically."
+)
+
+# Shown by the TUI's blocking gate when Ghostty is missing. There's nothing to
+# configure without Ghostty, so the modal offers a single action: quit.
+GHOSTTY_REQUIRED_MESSAGE = (
+    "Welchost needs Ghostty.\n\n"
+    "It builds a welcome screen for the Ghostty terminal, so there's nothing to "
+    "set up until Ghostty is installed.\n\n"
+    "Install it from https://ghostty.org, then relaunch welchost."
+)
+
 
 def is_dev() -> bool:
     """True if DEV mode is active, honoring the env var as a fallback."""

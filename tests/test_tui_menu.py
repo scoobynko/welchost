@@ -67,6 +67,50 @@ async def test_byline_visible_on_short_terminal(fake_home):
         assert "by scooby" in text
 
 
+async def test_blocks_with_modal_when_ghostty_missing(fake_home, monkeypatch):
+    """On launch without Ghostty, a quit-only modal gates the whole UI."""
+    detect.DEV_MODE = False
+    monkeypatch.setattr(detect, "ghostty_installed", lambda: False)
+
+    from welchost.tui.app import WelchostApp
+    from welchost.tui.screens.modals import GhosttyRequiredModal
+
+    app = WelchostApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, GhosttyRequiredModal)
+
+
+async def test_no_modal_when_ghostty_present(fake_home, monkeypatch):
+    """With Ghostty present, the menu shows and no gate appears."""
+    detect.DEV_MODE = False
+    monkeypatch.setattr(detect, "ghostty_installed", lambda: True)
+
+    from welchost.tui.app import WelchostApp
+    from welchost.tui.screens.modals import GhosttyRequiredModal
+
+    app = WelchostApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert not isinstance(app.screen, GhosttyRequiredModal)
+        assert isinstance(app.screen, MainMenu)
+
+
+async def test_gate_modal_quits_app(fake_home, monkeypatch):
+    """The modal's single action exits welchost; it never reaches the menu."""
+    detect.DEV_MODE = False
+    monkeypatch.setattr(detect, "ghostty_installed", lambda: False)
+
+    from welchost.tui.app import WelchostApp
+
+    app = WelchostApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+    assert not app.is_running
+
+
 async def test_esc_on_subscreen_goes_back():
     """esc on a pushed sub-screen still pops back to the menu beneath it."""
     from welchost.tui.app import WelchostApp

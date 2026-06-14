@@ -72,6 +72,8 @@ def preview() -> None:
         )
         cfg = WelchostConfig.default()
     console.print(render_banner(cfg))
+    if detect.should_warn_no_ghostty():
+        console.print(f"[yellow]Note:[/yellow] {detect.GHOSTTY_MISSING_NOTICE}")
 
 
 @app.command()

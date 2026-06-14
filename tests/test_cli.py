@@ -48,6 +48,20 @@ def test_preview_with_config(fake_home):
     assert "No config found" not in result.stdout
 
 
+def test_preview_warns_when_ghostty_missing(fake_home, monkeypatch):
+    monkeypatch.setattr(detect, "ghostty_installed", lambda: False)
+    result = runner.invoke(app, ["preview"])
+    assert result.exit_code == 0
+    assert "Ghostty" in result.stdout
+
+
+def test_preview_no_warning_when_ghostty_present(fake_home, monkeypatch):
+    monkeypatch.setattr(detect, "ghostty_installed", lambda: True)
+    result = runner.invoke(app, ["preview"])
+    assert result.exit_code == 0
+    assert "isn't installed" not in result.stdout
+
+
 def test_doctor_runs(fake_home):
     result = runner.invoke(app, ["--dev", "doctor"])
     assert result.exit_code == 0

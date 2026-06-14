@@ -51,6 +51,16 @@ class WelchostApp(App):
         else:
             self.push_screen(MainMenu())
 
+        # Ghostty is required for the banner to ever render, so if it's missing we
+        # block the UI behind a quit-only modal rather than let the user configure
+        # something that can't display. Skip the update/telemetry pings — the only
+        # path forward is to quit. (No-op in dev; see detect.)
+        if detect.should_warn_no_ghostty():
+            from .screens.modals import GhosttyRequiredModal
+
+            self.push_screen(GhosttyRequiredModal(detect.GHOSTTY_REQUIRED_MESSAGE))
+            return
+
         # Check PyPI for a newer release and offer to update (skipped in dev — no
         # nagging while hacking). Telemetry does its own gating (dev/key/consent),
         # so call it unconditionally; it no-ops in dev unless WELCHOST_TELEMETRY_FORCE
