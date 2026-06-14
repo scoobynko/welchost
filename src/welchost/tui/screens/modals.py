@@ -39,7 +39,7 @@ class ConfirmModal(ModalScreen[bool]):
     ConfirmModal { align: center middle; background: $background; }
     ConfirmModal #modal-box {
         width: 60; max-width: 90%; height: auto; padding: 1 2;
-        border: round $panel; background: $surface;
+        border: none; background: $surface;
     }
     ConfirmModal #modal-msg { padding: 0 0 1 0; }
     ConfirmModal #modal-buttons { height: auto; text-align: center; padding: 1 0 0 0; }
@@ -103,7 +103,7 @@ class GhosttyRequiredModal(ModalScreen[None]):
     GhosttyRequiredModal { align: center middle; background: $background; }
     GhosttyRequiredModal #modal-box {
         width: 60; max-width: 90%; height: auto; padding: 1 2;
-        border: round $panel; background: $surface;
+        border: none; background: $surface;
     }
     GhosttyRequiredModal #modal-msg { padding: 0 0 1 0; }
     GhosttyRequiredModal #modal-buttons { height: auto; text-align: center; padding: 1 0 0 0; }
