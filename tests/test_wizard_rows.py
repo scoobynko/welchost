@@ -65,3 +65,45 @@ async def test_row2_color_group_hidden_with_one_row(fake_home):
         app.screen.action_next()  # step 2 with a single row
         await pilot.pause()
         assert app.screen.query_one("#row-1-group").display is False
+
+
+async def test_show_all_fonts_toggle_expands_options(fake_home):
+    detect.DEV_MODE = True
+    from textual.widgets import Select, Switch
+
+    from welchost.tui.fonts import SAFE_FONTS, all_fonts
+
+    app = WelchostApp()
+    async with app.run_test() as pilot:
+        await app.push_screen(Wizard())
+        await pilot.pause()
+        font = app.screen.query_one("#font", Select)
+        # _options is a list of (label, value) tuples — stable in this Textual version.
+        # default options are the safe set
+        assert len(SAFE_FONTS) < len(all_fonts())
+        app.screen.query_one("#show-all-fonts", Switch).value = True
+        await pilot.pause()
+        # after toggling, the option count grows to the full catalogue
+        opts_after = [v for _, v in font._options]
+        assert len(opts_after) >= len(all_fonts())
+
+
+async def test_autofit_button_picks_a_fitting_font(fake_home):
+    detect.DEV_MODE = True
+    from textual.widgets import Button
+
+    from welchost.fit import art_width
+
+    app = WelchostApp()
+    async with app.run_test() as pilot:
+        await app.push_screen(Wizard())
+        await pilot.pause()
+        # Force a wide overflow then auto-fit.
+        app.model.banner.rows[0].text = "WELCOME"
+        app.model.banner.font = "colossal"
+        app.model.banner.fit_width = 40
+        app.screen.query_one("#text", Input).value = "WELCOME"
+        await pilot.pause()
+        app.screen.query_one("#autofit", Button).press()
+        await pilot.pause()
+        assert art_width(app.model, font=app.model.banner.font) <= 40
