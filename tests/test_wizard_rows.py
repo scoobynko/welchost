@@ -80,6 +80,8 @@ async def test_show_all_fonts_toggle_expands_options(fake_home):
         font = app.screen.query_one("#font", Select)
         # _options is a list of (label, value) tuples — stable in this Textual version.
         # default options are the safe set
+        opts_before = [v for _, v in font._options]
+        assert len(opts_before) == len(SAFE_FONTS)
         assert len(SAFE_FONTS) < len(all_fonts())
         app.screen.query_one("#show-all-fonts", Switch).value = True
         await pilot.pause()

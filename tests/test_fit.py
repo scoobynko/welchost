@@ -46,6 +46,15 @@ def test_auto_fit_picks_a_fitting_font_when_one_exists():
     assert chosen in candidates
     # The chosen font actually fits the target.
     assert art_width(cfg, font=chosen) <= 48
+    # The chosen font is the WIDEST fitting candidate (not merely any fitting one).
+    fitting_widths = [art_width(cfg, font=f) for f in candidates if art_width(cfg, font=f) <= 48]
+    assert fitting_widths, "test setup must have at least one fitting candidate"
+    assert art_width(cfg, font=chosen) == max(fitting_widths)
+
+
+def test_auto_fit_empty_candidates_returns_current_font():
+    cfg = _cfg("Hi", font="doom")
+    assert auto_fit_font(cfg, []) == "doom"
 
 
 def test_auto_fit_returns_widest_when_target_disabled():

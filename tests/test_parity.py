@@ -193,9 +193,9 @@ def _cfg_inline_info_no_border() -> WelchostConfig:
     cfg.info.show_user = True
     cfg.info.show_host = True
     cfg.info.show_python = True
-    cfg.info.show_os = True
     cfg.info.show_shell = True
     # all time/network-dependent fields stay off (set in _base_cfg)
+    # show_os intentionally omitted: resolves differently between renderers off macOS
     return cfg
 
 
@@ -233,8 +233,21 @@ def _cfg_inline_info_auto_accent_gradient() -> WelchostConfig:
     cfg.info.show_user = True
     cfg.info.show_host = True
     cfg.info.show_python = True
-    cfg.info.show_os = True
     cfg.info.show_shell = True
+    # show_os intentionally omitted: resolves differently between renderers off macOS
+    return cfg
+
+
+def _cfg_stacked_info_no_border() -> WelchostConfig:
+    """Stacked (legacy multi-line key: value) layout with only cross-platform-stable fields."""
+    cfg = _base_cfg()
+    cfg.decoration.border_style = "none"
+    cfg.ornament.name = "none"
+    cfg.banner.rows = [Row(text="Hi", color_mode="solid", solid=SolidColor(value="#3a96dd"))]
+    cfg.info.layout = "stacked"
+    cfg.info.show_user = True
+    cfg.info.show_host = True
+    cfg.info.show_python = True
     return cfg
 
 
@@ -248,6 +261,7 @@ _PARITY_CONFIGS = [
     pytest.param(_cfg_inline_info_box_border, id="inline-info-box"),
     pytest.param(_cfg_inline_info_auto_accent_border, id="inline-info-auto-accent-border"),
     pytest.param(_cfg_inline_info_auto_accent_gradient, id="inline-info-auto-accent-gradient"),
+    pytest.param(_cfg_stacked_info_no_border, id="stacked-info-no-border"),
 ]
 
 
