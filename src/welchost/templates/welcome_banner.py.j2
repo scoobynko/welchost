@@ -23,6 +23,7 @@ ORN_LEFT = {{ orn_left }}
 ORN_RIGHT = {{ orn_right }}
 ORN_RGB = {{ orn_rgb }}
 INFO = {{ info }}
+INFO_STYLE = {{ info_style }}
 
 RESET = "\x1b[0m"
 
@@ -151,26 +152,50 @@ def flank(art_lines, colored, artw):
 
 
 def info_lines():
-    lines = []
+    # Returns (plain_lines, disp_lines). Plain is used for width/border math;
+    # disp carries the ANSI styling. Mirrors render.py's info_text.
+    items = []
     if INFO.get("show_user"):
-        lines.append(("user", getpass.getuser()))
+        items.append(("user", getpass.getuser()))
     if INFO.get("show_host"):
-        lines.append(("host", socket.gethostname()))
+        items.append(("host", socket.gethostname()))
     if INFO.get("show_os"):
         mac = platform.mac_ver()[0]
-        osname = f"macOS {mac}" if mac else platform.platform(terse=True)
-        lines.append(("os", osname))
+        items.append(("os", f"macOS {mac}" if mac else platform.platform(terse=True)))
     if INFO.get("show_datetime"):
-        lines.append(("date", datetime.now().strftime("%a %d %b %Y · %H:%M")))
+        items.append(("date", datetime.now().strftime("%a %d %b %Y · %H:%M")))
     if INFO.get("show_uptime"):
-        lines.append(("uptime", _uptime()))
+        items.append(("uptime", _uptime()))
     if INFO.get("show_shell"):
-        lines.append(("shell", os.environ.get("SHELL", "?")))
+        items.append(("shell", os.environ.get("SHELL", "?")))
     if INFO.get("show_python"):
-        lines.append(("python", platform.python_version()))
+        items.append(("python", platform.python_version()))
     if INFO.get("show_ip"):
-        lines.append(("ip", _local_ip()))
-    return [f"{k}: {v}" for k, v in lines]
+        items.append(("ip", _local_ip()))
+    if not items:
+        return [], []
+
+    if INFO_STYLE["layout"] == "stacked":
+        plain = [f"{k}: {v}" for k, v in items]
+        disp = [f"\x1b[2m{k}: {RESET}{v}" for k, v in items]
+        return plain, disp
+
+    ar, ag, ab = INFO_STYLE["accent"]
+    vr, vg, vb = INFO_STYLE["value"]
+    sep = INFO_STYLE["separator"]
+    label_c = f"\x1b[38;2;{ar};{ag};{ab}m"
+    value_c = f"\x1b[2;38;2;{vr};{vg};{vb}m"
+    sep_c = f"\x1b[2;38;2;{ar};{ag};{ab}m"
+    plain_parts, disp_parts = [], []
+    for idx, (k, v) in enumerate(items):
+        if idx:
+            plain_parts.append(f"  {sep}  ")
+            disp_parts.append(f"{sep_c}  {sep}  {RESET}")
+        plain_parts.append(f"{k} ")
+        disp_parts.append(f"{label_c}{k} {RESET}")
+        plain_parts.append(str(v))
+        disp_parts.append(f"{value_c}{v}{RESET}")
+    return ["".join(plain_parts)], ["".join(disp_parts)]
 
 
 def _uptime():
@@ -201,19 +226,20 @@ def render():
     if ORN_LEFT or ORN_RIGHT:
         art_lines, colored = flank(art_lines, colored, artw)
 
-    extra = info_lines()
+    info_plain, info_disp = info_lines()
     body = list(art_lines)
-    if extra:
+    colored_body = list(colored)
+    if info_plain:
         body.append("")
-        body.extend(extra)
+        colored_body.append("")
+        body.extend(info_plain)
+        colored_body.extend(info_disp)
 
     width = max((visible_len(ln) for ln in body), default=0)
 
     if BORDER_STYLE == "none":
         lead = align_pad(width)
-        for ln in colored:
-            print(lead + ln)
-        for ln in extra:
+        for ln in colored_body:
             print(lead + ln)
         return
 
@@ -227,7 +253,7 @@ def render():
 
     print(f"{lead}{bc}{tl}{h * inner}{tr}{bce}")
     for idx, ln in enumerate(body):
-        content = colored[idx] if idx < len(colored) else ln
+        content = colored_body[idx]
         gap = " " * (width - visible_len(ln))
         print(f"{lead}{bc}{v}{bce}{' ' * pad}{content}{gap}{' ' * pad}{bc}{v}{bce}")
     print(f"{lead}{bc}{bl}{h * inner}{br}{bce}")

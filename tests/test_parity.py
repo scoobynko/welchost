@@ -179,17 +179,80 @@ def _cfg_mixed_two_rows_rounded() -> WelchostConfig:
     return cfg
 
 
+def _cfg_inline_info_no_border() -> WelchostConfig:
+    """Inline styled metadata, border none. Only run-stable info fields (no date)."""
+    cfg = _base_cfg()
+    cfg.decoration.border_style = "none"
+    cfg.ornament.name = "none"
+    cfg.banner.rows = [
+        Row(text="Hi", color_mode="solid", solid=SolidColor(value="#3a96dd")),
+    ]
+    cfg.info.layout = "inline"
+    cfg.info.separator = "·"
+    cfg.info.accent = "#d97757"
+    cfg.info.show_user = True
+    cfg.info.show_host = True
+    cfg.info.show_python = True
+    cfg.info.show_os = True
+    cfg.info.show_shell = True
+    # all time/network-dependent fields stay off (set in _base_cfg)
+    return cfg
+
+
+def _cfg_inline_info_box_border() -> WelchostConfig:
+    cfg = _cfg_inline_info_no_border()
+    cfg.decoration.border_style = "box"
+    cfg.decoration.border_color = "cyan"
+    return cfg
+
+
+def _cfg_inline_info_auto_accent_border() -> WelchostConfig:
+    """Auto accent resolves to border color when border is set."""
+    cfg = _cfg_inline_info_no_border()
+    cfg.info.accent = "auto"
+    cfg.decoration.border_style = "box"
+    cfg.decoration.border_color = "cyan"
+    return cfg
+
+
+def _cfg_inline_info_auto_accent_gradient() -> WelchostConfig:
+    """Auto accent resolves to gradient.start color when no border."""
+    cfg = _base_cfg()
+    cfg.decoration.border_style = "none"
+    cfg.ornament.name = "none"
+    cfg.banner.rows = [
+        Row(
+            text="Hi",
+            color_mode="gradient",
+            gradient=GradientColor(start="cyan", end="magenta", direction="horizontal"),
+        ),
+    ]
+    cfg.info.layout = "inline"
+    cfg.info.separator = "·"
+    cfg.info.accent = "auto"
+    cfg.info.show_user = True
+    cfg.info.show_host = True
+    cfg.info.show_python = True
+    cfg.info.show_os = True
+    cfg.info.show_shell = True
+    return cfg
+
+
 _PARITY_CONFIGS = [
     pytest.param(_cfg_solid_two_rows_no_border, id="solid-two-rows-no-border"),
     pytest.param(_cfg_gradient_two_rows_no_border, id="gradient-two-rows-no-border"),
     pytest.param(_cfg_solid_two_rows_box_border, id="solid-two-rows-box"),
     pytest.param(_cfg_gradient_one_row_ghosts, id="gradient-one-row-ghosts"),
     pytest.param(_cfg_mixed_two_rows_rounded, id="mixed-two-rows-rounded"),
+    pytest.param(_cfg_inline_info_no_border, id="inline-info-no-border"),
+    pytest.param(_cfg_inline_info_box_border, id="inline-info-box"),
+    pytest.param(_cfg_inline_info_auto_accent_border, id="inline-info-auto-accent-border"),
+    pytest.param(_cfg_inline_info_auto_accent_gradient, id="inline-info-auto-accent-gradient"),
 ]
 
 
 # ---------------------------------------------------------------------------
-# Parity test (one parametrised function → 5 test cases)
+# Parity test (one parametrised function → 9 test cases: 5 art + 4 info)
 # ---------------------------------------------------------------------------
 
 

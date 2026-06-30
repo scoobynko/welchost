@@ -22,6 +22,7 @@ from .config import (
     VALID_BORDER_STYLES,
     VALID_COLOR_MODES,
     VALID_GRADIENT_DIRECTIONS,
+    VALID_INFO_LAYOUTS,
     WelchostConfig,
 )
 from .ornaments import get_ornament
@@ -184,6 +185,7 @@ def render_welcome_banner(config: WelchostConfig) -> str:
         orn_right=json.dumps(orn_right),
         orn_rgb=repr(orn_rgb),
         info=repr(_info_dict(config)),
+        info_style=json.dumps(_info_style(config)),
     )
 
 
@@ -198,6 +200,25 @@ def _info_dict(config: WelchostConfig) -> dict[str, bool]:
         "show_shell": i.show_shell,
         "show_python": i.show_python,
         "show_ip": i.show_ip,
+    }
+
+
+def _info_style(config: WelchostConfig) -> dict:
+    info = config.info
+    first = config.banner.rows[0]
+    banner_color = first.gradient.start if first.color_mode == "gradient" else first.solid.value
+    banner_rgb = resolve_color(banner_color)
+    if info.accent != "auto":
+        accent_rgb = resolve_color(info.accent)
+    elif config.decoration.border_style != "none":
+        accent_rgb = resolve_color(config.decoration.border_color)
+    else:
+        accent_rgb = banner_rgb
+    return {
+        "layout": _enum(info.layout, VALID_INFO_LAYOUTS, "inline"),
+        "separator": info.separator,
+        "accent": list(accent_rgb),
+        "value": list(banner_rgb),
     }
 
 

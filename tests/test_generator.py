@@ -165,3 +165,13 @@ def test_curated_fonts_are_all_valid():
 
     invalid = [f for f in CURATED if not generator.font_exists(f)]
     assert invalid == [], f"invalid curated fonts: {invalid}"
+
+
+def test_info_style_baked(fake_home):
+    cfg = WelchostConfig.default()
+    cfg.info.layout = "inline"
+    cfg.info.accent = "#d97757"
+    _, banner = generator.write_generated_files(cfg)
+    src = banner.read_text()
+    assert "INFO_STYLE" in src
+    assert '"layout": "inline"' in src
