@@ -163,7 +163,7 @@ def render_art(cfg: WelchostConfig) -> Text:
     return block
 
 
-def info_text(cfg: WelchostConfig) -> Text | None:
+def _info_items(cfg: WelchostConfig) -> list[tuple[str, str]]:
     rows: list[tuple[str, str]] = []
     i = cfg.info
     if i.show_user:
@@ -183,14 +183,49 @@ def info_text(cfg: WelchostConfig) -> Text | None:
         rows.append(("python", platform.python_version()))
     if i.show_ip:
         rows.append(("ip", "…"))
-    if not rows:
+    return rows
+
+
+def _banner_color(cfg: WelchostConfig) -> str:
+    first = cfg.banner.rows[0]
+    return first.gradient.start if first.color_mode == "gradient" else first.solid.value
+
+
+def _info_accent_rgb(cfg: WelchostConfig) -> tuple[int, int, int]:
+    accent = cfg.info.accent
+    if accent != "auto":
+        return resolve_color(accent)
+    if cfg.decoration.border_style != "none":
+        return resolve_color(cfg.decoration.border_color)
+    return resolve_color(_banner_color(cfg))
+
+
+def info_text(cfg: WelchostConfig) -> Text | None:
+    items = _info_items(cfg)
+    if not items:
         return None
+
+    if cfg.info.layout == "stacked":
+        t = Text()
+        for idx, (k, v) in enumerate(items):
+            t.append(f"{k}: ", style="dim")
+            t.append(str(v))
+            if idx != len(items) - 1:
+                t.append("\n")
+        return t
+
+    ar, ag, ab = _info_accent_rgb(cfg)
+    vr, vg, vb = resolve_color(_banner_color(cfg))
+    label_style = f"rgb({ar},{ag},{ab})"
+    value_style = f"dim rgb({vr},{vg},{vb})"
+    sep_style = f"dim rgb({ar},{ag},{ab})"
+    sep = f"  {cfg.info.separator}  "
     t = Text()
-    for idx, (k, v) in enumerate(rows):
-        t.append(f"{k}: ", style="dim")
-        t.append(str(v))
-        if idx != len(rows) - 1:
-            t.append("\n")
+    for idx, (k, v) in enumerate(items):
+        if idx:
+            t.append(sep, style=sep_style)
+        t.append(f"{k} ", style=label_style)
+        t.append(str(v), style=value_style)
     return t
 
 

@@ -43,3 +43,39 @@ def test_each_row_uses_its_own_color(fake_home):
 
 def test_single_row_still_renders(fake_home):
     assert render_art(_one_row("Hi")).plain.strip()
+
+
+def _info_cfg(layout="inline"):
+    from welchost.config import Row, SolidColor
+
+    cfg = WelchostConfig.default()
+    cfg.banner.rows = [Row(text="Hi", color_mode="solid", solid=SolidColor(value="#3a96dd"))]
+    cfg.decoration.border_style = "none"
+    cfg.info.show_user = True
+    cfg.info.show_datetime = False
+    cfg.info.show_host = True
+    cfg.info.layout = layout
+    cfg.info.separator = "·"
+    cfg.info.accent = "#d97757"
+    return cfg
+
+
+def test_info_inline_is_single_line_with_accent_and_separator(fake_home):
+    from welchost.render import info_text
+
+    t = info_text(_info_cfg("inline"))
+    assert t is not None
+    assert "\n" not in t.plain  # single inline line
+    assert "·" in t.plain  # separator between the two items
+    styles = {str(s.style) for s in t.spans}
+    # Accent (terracotta #d97757 -> 217,119,87) used for labels.
+    assert any("217,119,87" in s for s in styles)
+
+
+def test_info_stacked_is_multiline_legacy(fake_home):
+    from welchost.render import info_text
+
+    t = info_text(_info_cfg("stacked"))
+    assert t is not None
+    assert "\n" in t.plain  # one line per item
+    assert "user: " in t.plain
