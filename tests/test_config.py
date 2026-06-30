@@ -98,6 +98,26 @@ def test_save_creates_config_dir(fake_home):
     assert detect.get_config_path().exists()
 
 
+def test_info_styling_fields_default(fake_home):
+    info = WelchostConfig.default().info
+    assert info.layout == "inline"
+    assert info.separator == "·"
+    assert info.accent == "auto"
+
+
+def test_info_styling_roundtrip(fake_home):
+    cfg = WelchostConfig.default()
+    cfg.info.layout = "stacked"
+    cfg.info.separator = "|"
+    cfg.info.accent = "#ff0000"
+    save_config(cfg)
+    loaded = load_config()
+    assert loaded is not None
+    assert loaded.info.layout == "stacked"
+    assert loaded.info.separator == "|"
+    assert loaded.info.accent == "#ff0000"
+
+
 def test_decoration_ornament_info_roundtrip(fake_home):
     cfg = WelchostConfig.default()
     cfg.decoration.border_style = "double"

@@ -21,6 +21,7 @@ VALID_ALIGN = ("left", "center", "right")
 VALID_COLOR_MODES = ("solid", "gradient")
 VALID_GRADIENT_DIRECTIONS = ("horizontal", "vertical", "diagonal")
 VALID_BORDER_STYLES = ("panel", "box", "double", "rounded", "ascii", "none")
+VALID_INFO_LAYOUTS = ("inline", "stacked")
 
 
 @dataclass
@@ -80,6 +81,10 @@ class Info:
     show_shell: bool = False
     show_python: bool = False
     show_ip: bool = False
+    # Styling (Phase 2): inline row that inherits the banner palette.
+    layout: str = "inline"  # inline | stacked
+    separator: str = "·"
+    accent: str = "auto"  # auto (inherit) | Rich color name / hex
 
 
 @dataclass
