@@ -33,13 +33,13 @@ def test_theme_ornament_is_valid(theme):
 @pytest.mark.parametrize("theme", all_themes(), ids=lambda t: t.name)
 def test_theme_converts_to_config(theme):
     cfg = theme.to_config(text="Hi")
-    assert cfg.banner.text == "Hi"
+    assert cfg.banner.rows[0].text == "Hi"
     assert cfg.banner.font == theme.font
     assert cfg.decoration.border_style == theme.border_style
     if theme.is_gradient:
-        assert cfg.banner.color_mode == "gradient"
+        assert cfg.banner.rows[0].color_mode == "gradient"
     else:
-        assert cfg.banner.color_mode == "solid"
+        assert cfg.banner.rows[0].color_mode == "solid"
 
 
 def test_sunset_is_gradient():
@@ -47,8 +47,8 @@ def test_sunset_is_gradient():
     assert sunset is not None
     assert sunset.is_gradient
     cfg = sunset.to_config()
-    assert cfg.gradient.start == "#ff6b35"
-    assert cfg.gradient.end == "#f7c59f"
+    assert cfg.banner.rows[0].gradient.start == "#ff6b35"
+    assert cfg.banner.rows[0].gradient.end == "#f7c59f"
 
 
 def test_get_unknown_theme_returns_none():
