@@ -54,25 +54,6 @@ class Banner:
     fit_width: int = 80  # target width for fit checks (0 disables)
     rows: list[Row] = field(default_factory=lambda: [Row()])
 
-    # --- TEMPORARY single-row compatibility shims (removed in Phase-1 Task 6) ---
-    # Let consumers that still read/write the old flat fields keep working against
-    # row 0 until they are migrated to the rows API.
-    @property
-    def text(self) -> str:
-        return self.rows[0].text
-
-    @text.setter
-    def text(self, value: str) -> None:
-        self.rows[0].text = value
-
-    @property
-    def color_mode(self) -> str:
-        return self.rows[0].color_mode
-
-    @color_mode.setter
-    def color_mode(self, value: str) -> None:
-        self.rows[0].color_mode = value
-
 
 @dataclass
 class Decoration:
@@ -161,15 +142,6 @@ class WelchostConfig:
     @classmethod
     def default(cls) -> WelchostConfig:
         return cls()
-
-    # --- TEMPORARY compatibility shims (removed in Phase-1 Task 6) ---
-    @property
-    def solid(self) -> SolidColor:
-        return self.banner.rows[0].solid
-
-    @property
-    def gradient(self) -> GradientColor:
-        return self.banner.rows[0].gradient
 
     # -- (de)serialization -------------------------------------------------
 

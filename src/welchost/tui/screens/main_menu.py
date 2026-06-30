@@ -163,8 +163,9 @@ class EditMenu(_Menu):
 
     def header_widget(self) -> Widget:
         m = self.app.model
-        color = "gradient" if m.banner.color_mode == "gradient" else m.solid.value
-        summary = f"{m.banner.text} · {m.banner.font} · {color}"
+        row0 = m.banner.rows[0]
+        color = "gradient" if row0.color_mode == "gradient" else row0.solid.value
+        summary = f"{row0.text} · {m.banner.font} · {color}"
         return Vertical(
             Logo(),
             Static(f"[{ACCENT}]●[/] welcome screen active", classes="section-label"),

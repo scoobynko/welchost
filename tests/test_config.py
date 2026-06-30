@@ -83,19 +83,6 @@ def test_legacy_size_key_is_ignored(fake_home):
     assert not hasattr(cfg.banner, "size")
 
 
-def test_compat_shims_proxy_first_row(fake_home):
-    # Temporary shims (removed in Task 6) let unmigrated callers read/write row 0.
-    cfg = WelchostConfig.default()
-    cfg.banner.text = "Shimmed"
-    cfg.banner.color_mode = "gradient"
-    cfg.solid.value = "red"
-    cfg.gradient.start = "blue"
-    assert cfg.banner.rows[0].text == "Shimmed"
-    assert cfg.banner.rows[0].color_mode == "gradient"
-    assert cfg.banner.rows[0].solid.value == "red"
-    assert cfg.banner.rows[0].gradient.start == "blue"
-
-
 def test_save_stamps_created_at_and_version(fake_home):
     cfg = WelchostConfig.default()
     assert cfg.meta.created_at == ""

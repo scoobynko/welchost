@@ -120,12 +120,11 @@ def _render_figlet(font: str, text: str) -> str:
 
 
 def build_figlet(config: WelchostConfig) -> str:
-    """Render the banner text to ASCII art with pyfiglet at the font's native size.
+    """Render the first banner row to ASCII art at the font's native size.
 
-    Falls back to the ``standard`` font if the configured font is missing, so a
-    bad font name can never crash generation or install.
+    Falls back to the ``standard`` font if the configured font is missing.
     """
-    return _render_figlet(config.banner.font, config.banner.text)
+    return _render_figlet(config.banner.font, config.banner.rows[0].text)
 
 
 # --- template rendering ------------------------------------------------------
