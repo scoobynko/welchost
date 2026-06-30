@@ -152,27 +152,33 @@ def _enum(value: str, allowed: tuple[str, ...], default: str) -> str:
 
 
 def render_welcome_banner(config: WelchostConfig) -> str:
-    art = build_figlet(config)
     # Clamp every enum baked as a raw string into the generated Python source.
     align = _enum(config.banner.align, VALID_ALIGN, "left")
-    color_mode = _enum(config.banner.color_mode, VALID_COLOR_MODES, "solid")
-    grad_direction = _enum(config.gradient.direction, VALID_GRADIENT_DIRECTIONS, "horizontal")
     border_style = _enum(config.decoration.border_style, VALID_BORDER_STYLES, "none")
-
     border_rgb = None if border_style == "none" else resolve_color(config.decoration.border_color)
+
+    rows = []
+    for row in config.banner.rows:
+        rows.append(
+            {
+                "art": _render_figlet(config.banner.font, row.text),
+                "color_mode": _enum(row.color_mode, VALID_COLOR_MODES, "solid"),
+                "solid": list(resolve_color(row.solid.value)),
+                "grad_start": list(resolve_color(row.gradient.start)),
+                "grad_end": list(resolve_color(row.gradient.end)),
+                "grad_dir": _enum(row.gradient.direction, VALID_GRADIENT_DIRECTIONS, "horizontal"),
+            }
+        )
+
+    first = config.banner.rows[0]
     orn_left, orn_right = get_ornament(config.ornament.name)
-    orn_color = config.gradient.start if color_mode == "gradient" else config.solid.value
+    orn_color = first.gradient.start if first.color_mode == "gradient" else first.solid.value
     orn_rgb = resolve_color(orn_color) if (orn_left or orn_right) else None
     template = _env().get_template("welcome_banner.py.j2")
     return template.render(
         version=__version__,
-        art_json=json.dumps(art),
+        rows=json.dumps(rows),
         align=align,
-        color_mode=color_mode,
-        grad_direction=grad_direction,
-        solid_rgb=repr(resolve_color(config.solid.value)),
-        grad_start_rgb=repr(resolve_color(config.gradient.start)),
-        grad_end_rgb=repr(resolve_color(config.gradient.end)),
         border_style=border_style,
         border_rgb=repr(border_rgb),
         orn_left=json.dumps(orn_left),
