@@ -107,3 +107,23 @@ async def test_autofit_button_picks_a_fitting_font(fake_home):
         app.screen.query_one("#autofit", Button).press()
         await pilot.pause()
         assert art_width(app.model, font=app.model.banner.font) <= 40
+
+
+async def test_metadata_controls_mutate_model(fake_home):
+    detect.DEV_MODE = True
+    from textual.widgets import Input, Select
+
+    app = WelchostApp()
+    async with app.run_test() as pilot:
+        await app.push_screen(Wizard())
+        await pilot.pause()
+        app.screen.action_next()  # step 2
+        app.screen.action_next()  # step 3 (decoration + info)
+        await pilot.pause()
+        app.screen.query_one("#info-layout", Select).value = "stacked"
+        app.screen.query_one("#info-separator", Input).value = "|"
+        app.screen.query_one("#info-accent", Input).value = "#ff0000"
+        await pilot.pause()
+        assert app.model.info.layout == "stacked"
+        assert app.model.info.separator == "|"
+        assert app.model.info.accent == "#ff0000"
