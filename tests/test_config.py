@@ -96,3 +96,20 @@ def test_save_creates_config_dir(fake_home):
     assert not detect.get_config_dir().exists()
     save_config(WelchostConfig.default())
     assert detect.get_config_path().exists()
+
+
+def test_decoration_ornament_info_roundtrip(fake_home):
+    cfg = WelchostConfig.default()
+    cfg.decoration.border_style = "double"
+    cfg.decoration.border_color = "#ff0000"
+    cfg.ornament.name = "ghosts"
+    cfg.info.show_python = True
+    cfg.info.show_user = False
+    save_config(cfg)
+    loaded = load_config()
+    assert loaded is not None
+    assert loaded.decoration.border_style == "double"
+    assert loaded.decoration.border_color == "#ff0000"
+    assert loaded.ornament.name == "ghosts"
+    assert loaded.info.show_python is True
+    assert loaded.info.show_user is False
