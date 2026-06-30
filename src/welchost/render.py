@@ -20,7 +20,7 @@ from rich.panel import Panel
 from rich.text import Text
 
 from .config import WelchostConfig
-from .generator import build_figlet, resolve_color
+from .generator import _render_figlet, resolve_color
 from .ornaments import get_ornament
 
 _BOX_MAP = {
@@ -61,13 +61,19 @@ def _strip_blank_edges(lines: list[str]) -> list[str]:
     return out
 
 
-def _art_rows(cfg: WelchostConfig, lines: list[str]) -> list[Text]:
-    """One styled Text per art line (gradient or solid)."""
+def _art_rows(
+    lines: list[str],
+    color_mode: str,
+    solid_value: str,
+    grad_start: str,
+    grad_end: str,
+    direction: str,
+) -> list[Text]:
+    """One styled Text per art line (gradient or solid) for a single row block."""
     rows: list[Text] = []
-    if cfg.banner.color_mode == "gradient":
-        s = resolve_color(cfg.gradient.start)
-        e = resolve_color(cfg.gradient.end)
-        direction = cfg.gradient.direction
+    if color_mode == "gradient":
+        s = resolve_color(grad_start)
+        e = resolve_color(grad_end)
         dx = max(max((len(ln) for ln in lines), default=1) - 1, 1)
         dy = max(len(lines) - 1, 1)
         for row, line in enumerate(lines):
@@ -78,7 +84,7 @@ def _art_rows(cfg: WelchostConfig, lines: list[str]) -> list[Text]:
                 tx.append(ch, style=f"bold rgb({r},{g},{b})")
             rows.append(tx)
     else:
-        r, g, b = resolve_color(cfg.solid.value)
+        r, g, b = resolve_color(solid_value)
         rows = [Text(line, style=f"bold rgb({r},{g},{b})") for line in lines]
     return rows
 
@@ -89,7 +95,8 @@ def _flank(rows: list[Text], cfg: WelchostConfig) -> list[Text]:
     if not left and not right:
         return rows
 
-    color = cfg.gradient.start if cfg.banner.color_mode == "gradient" else cfg.solid.value
+    first = cfg.banner.rows[0]
+    color = first.gradient.start if first.color_mode == "gradient" else first.solid.value
     r, g, b = resolve_color(color)
     style = f"rgb({r},{g},{b})"
     lw = max((len(s) for s in left), default=0)
@@ -122,17 +129,31 @@ def _flank(rows: list[Text], cfg: WelchostConfig) -> list[Text]:
     return out
 
 
-def render_art(cfg: WelchostConfig) -> Text:
-    """The colored figlet block (no border, no info), optionally flanked by an
-    ornament.
-
-    Gradient runs across the whole block per ``gradient.direction`` — horizontal
-    (left→right), vertical (top→bottom), or diagonal — so the factor is computed
-    from each character's position within the block, not just within its line.
-    """
-    art = build_figlet(cfg)
+def _row_block(cfg: WelchostConfig, row) -> list[Text]:
+    """Colored Text lines for a single banner row, rendered in the shared font."""
+    art = _render_figlet(cfg.banner.font, row.text)
     lines = _strip_blank_edges(art.splitlines())
-    rows = _flank(_art_rows(cfg, lines), cfg)
+    return _art_rows(
+        lines,
+        row.color_mode,
+        row.solid.value,
+        row.gradient.start,
+        row.gradient.end,
+        row.gradient.direction,
+    )
+
+
+def render_art(cfg: WelchostConfig) -> Text:
+    """The colored figlet block(s), stacked one row per banner row (blank line
+    between), optionally flanked by an ornament. Each row is colored by its own
+    row config; gradients run within each row's own block."""
+    stacked: list[Text] = []
+    for i, row in enumerate(cfg.banner.rows):
+        if i:
+            stacked.append(Text(""))  # blank separator between stacked rows
+        stacked.extend(_row_block(cfg, row))
+
+    rows = _flank(stacked, cfg)
 
     block = Text()
     for i, row in enumerate(rows):
