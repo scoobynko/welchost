@@ -67,12 +67,13 @@ async def test_row2_color_group_hidden_with_one_row(fake_home):
         assert app.screen.query_one("#row-1-group").display is False
 
 
-async def test_font_picker_shows_only_safe_fonts(fake_home):
-    # The wizard offers the safe set only — no "show all" clutter.
+async def test_font_picker_offers_full_catalog_curated_first(fake_home):
+    # The picker offers every pyfiglet font (curated first) — width safety is
+    # handled under the hood on save, so the choice needn't be restricted.
     detect.DEV_MODE = True
     from textual.widgets import Select
 
-    from welchost.tui.fonts import SAFE_FONTS
+    from welchost.tui.fonts import CURATED, all_fonts
 
     app = WelchostApp()
     async with app.run_test() as pilot:
@@ -80,26 +81,26 @@ async def test_font_picker_shows_only_safe_fonts(fake_home):
         await pilot.pause()
         font = app.screen.query_one("#font", Select)
         opts = [v for _, v in font._options]
-        assert opts == list(SAFE_FONTS)
+        assert len(opts) == len(all_fonts())  # the whole catalogue
+        assert opts[0] == CURATED[0]  # curated surfaced first
+        assert "isometric1" in opts  # a cool non-"safe" font is available again
 
 
-async def test_non_safe_font_from_toml_stays_selectable(fake_home):
-    # TOML escape hatch: a hand-set non-safe font is prepended so it isn't lost.
+async def test_unknown_configured_font_stays_selectable(fake_home):
+    # Robustness / escape hatch: a font name not in the catalogue (e.g. a typo or
+    # removed font in a hand-edited welchost.toml) is prepended so it isn't lost.
     detect.DEV_MODE = True
     from textual.widgets import Select
 
-    from welchost.tui.fonts import SAFE_FONTS
-
     app = WelchostApp()
     async with app.run_test() as pilot:
-        app.model.banner.font = "isometric1"  # valid pyfiglet font, not in SAFE_FONTS
-        assert "isometric1" not in SAFE_FONTS
+        app.model.banner.font = "not-a-real-font"
         await app.push_screen(Wizard())
         await pilot.pause()
         font = app.screen.query_one("#font", Select)
         opts = [v for _, v in font._options]
-        assert opts[0] == "isometric1"
-        assert font.value == "isometric1"
+        assert opts[0] == "not-a-real-font"
+        assert font.value == "not-a-real-font"
 
 
 async def test_autofit_on_save_shrinks_overflowing_font(fake_home):

@@ -1,8 +1,9 @@
 """Wizard step 1 — stacked text rows + shared font + alignment.
 
-The font picker offers the curated safe set only; width-safety is applied under
-the hood on save (see StepConfirm._apply_autofit). A non-safe font set by hand in
-welchost.toml still loads and stays selectable here — the TOML escape hatch.
+The font picker offers the whole pyfiglet catalogue (curated first, type-to-jump);
+width-safety is applied under the hood on save (see StepConfirm._apply_autofit),
+so the choice needn't be restricted. A font that fits is kept as picked; only an
+overflowing one is silently swapped on save.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from textual.containers import Vertical
 from textual.widgets import Input, Label, Select
 
 from ...config import Row
-from ..fonts import safe_font_options
+from ..fonts import font_options
 
 ALIGNMENTS = ["left", "center", "right"]
 
@@ -29,7 +30,7 @@ class StepTextFont(Vertical):
         yield Input(rows[0].text, placeholder="Welcome", id="text")
         yield Label("second row  (optional · leave blank for one line)", classes="section-label")
         yield Input(rows[1].text if len(rows) > 1 else "", placeholder="(none)", id="text2")
-        yield Label("font", classes="section-label")
+        yield Label("font  (type to jump · curated first)", classes="section-label")
         yield Select(
             self._font_opts(m.banner.font), id="font", value=m.banner.font, allow_blank=False
         )
@@ -40,10 +41,10 @@ class StepTextFont(Vertical):
 
     @staticmethod
     def _font_opts(current: str) -> list[tuple[str, str]]:
-        """Safe fonts only. A non-safe font already configured (e.g. from a
-        hand-edited welchost.toml) is prepended so it stays selectable rather than
-        being silently dropped — the TOML escape hatch."""
-        opts = safe_font_options()
+        """The whole pyfiglet catalogue, curated first. A configured font name
+        that isn't in the catalogue (a typo or removed font in a hand-edited
+        welchost.toml) is prepended so it stays selectable rather than dropped."""
+        opts = font_options()
         if current not in {value for _, value in opts}:
             return [(current, current), *opts]
         return opts
