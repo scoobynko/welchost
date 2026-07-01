@@ -67,48 +67,59 @@ async def test_row2_color_group_hidden_with_one_row(fake_home):
         assert app.screen.query_one("#row-1-group").display is False
 
 
-async def test_show_all_fonts_toggle_expands_options(fake_home):
+async def test_font_picker_shows_only_safe_fonts(fake_home):
+    # The wizard offers the safe set only — no "show all" clutter.
     detect.DEV_MODE = True
-    from textual.widgets import Select, Switch
+    from textual.widgets import Select
 
-    from welchost.tui.fonts import SAFE_FONTS, all_fonts
+    from welchost.tui.fonts import SAFE_FONTS
 
     app = WelchostApp()
     async with app.run_test() as pilot:
         await app.push_screen(Wizard())
         await pilot.pause()
         font = app.screen.query_one("#font", Select)
-        # _options is a list of (label, value) tuples — stable in this Textual version.
-        # default options are the safe set
-        opts_before = [v for _, v in font._options]
-        assert len(opts_before) == len(SAFE_FONTS)
-        assert len(SAFE_FONTS) < len(all_fonts())
-        app.screen.query_one("#show-all-fonts", Switch).value = True
-        await pilot.pause()
-        # after toggling, the option count grows to the full catalogue
-        opts_after = [v for _, v in font._options]
-        assert len(opts_after) >= len(all_fonts())
+        opts = [v for _, v in font._options]
+        assert opts == list(SAFE_FONTS)
 
 
-async def test_autofit_button_picks_a_fitting_font(fake_home):
+async def test_non_safe_font_from_toml_stays_selectable(fake_home):
+    # TOML escape hatch: a hand-set non-safe font is prepended so it isn't lost.
     detect.DEV_MODE = True
-    from textual.widgets import Button
+    from textual.widgets import Select
 
-    from welchost.fit import art_width
+    from welchost.tui.fonts import SAFE_FONTS
+
+    app = WelchostApp()
+    async with app.run_test() as pilot:
+        app.model.banner.font = "isometric1"  # valid pyfiglet font, not in SAFE_FONTS
+        assert "isometric1" not in SAFE_FONTS
+        await app.push_screen(Wizard())
+        await pilot.pause()
+        font = app.screen.query_one("#font", Select)
+        opts = [v for _, v in font._options]
+        assert opts[0] == "isometric1"
+        assert font.value == "isometric1"
+
+
+async def test_autofit_on_save_shrinks_overflowing_font(fake_home):
+    # Width-safety is now under the hood: on save, an overflowing banner is
+    # silently swapped to the largest safe font that fits — no visible control.
+    detect.DEV_MODE = True
+    from welchost.fit import fits
 
     app = WelchostApp()
     async with app.run_test() as pilot:
         await app.push_screen(Wizard())
         await pilot.pause()
-        # Force a wide overflow then auto-fit.
-        app.model.banner.rows[0].text = "WELCOME"
-        app.model.banner.font = "colossal"
-        app.model.banner.fit_width = 40
-        app.screen.query_one("#text", Input).value = "WELCOME"
-        await pilot.pause()
-        app.screen.query_one("#autofit", Button).press()
-        await pilot.pause()
-        assert art_width(app.model, font=app.model.banner.font) <= 40
+        m = app.model
+        m.banner.rows[0].text = "WELCOME"
+        m.banner.font = "colossal"  # a safe font, but wide enough to overflow
+        m.banner.fit_width = 40
+        assert not fits(m)  # precondition: overflows the target
+        confirm = app.screen.steps[3]  # StepConfirm
+        confirm._apply_autofit()
+        assert fits(m)  # now fits, silently
 
 
 async def test_metadata_controls_mutate_model(fake_home):

@@ -37,10 +37,25 @@ class StepConfirm(Vertical):
         lines.append(f"  {zstate}  {zshrc.name}")
         return "\n".join(lines)
 
+    def _apply_autofit(self) -> None:
+        """Width-safety, under the hood: if the banner would overflow its
+        ``banner.fit_width``, silently swap to the largest safe font that fits.
+
+        Runs only on the wizard save path, so a font set by hand in welchost.toml
+        (the TOML escape hatch) is never touched. No-op when the banner fits or the
+        fit target is disabled (``fit_width <= 0``)."""
+        from ...fit import auto_fit_font, fits
+        from ..fonts import SAFE_FONTS
+
+        model = self.app.model
+        if not fits(model):
+            model.banner.font = auto_fit_font(model, list(SAFE_FONTS))
+
     def do_save(self) -> None:
         from ...config import save_config
         from ...generator import install
 
+        self._apply_autofit()
         try:
             save_config(self.app.model)
             paths = install(self.app.model)
