@@ -61,21 +61,30 @@ def _info_cfg(layout="inline"):
 
 
 def test_info_inline_is_single_line_with_accent_and_separator(fake_home):
+    import getpass
+
     from welchost.render import info_text
 
     t = info_text(_info_cfg("inline"))
     assert t is not None
     assert "\n" not in t.plain  # single inline line
     assert "·" in t.plain  # separator between the two items
+    # No "user "/"host " label prefixes — just the values.
+    assert t.plain.startswith(getpass.getuser())
+    assert "user " not in t.plain
+    assert "host " not in t.plain
     styles = {str(s.style) for s in t.spans}
-    # Accent (terracotta #d97757 -> 217,119,87) used for labels.
+    # Accent (terracotta #d97757 -> 217,119,87) still colours the separators.
     assert any("217,119,87" in s for s in styles)
 
 
-def test_info_stacked_is_multiline_legacy(fake_home):
+def test_info_stacked_is_multiline_values_only(fake_home):
+    import getpass
+
     from welchost.render import info_text
 
     t = info_text(_info_cfg("stacked"))
     assert t is not None
     assert "\n" in t.plain  # one line per item
-    assert "user: " in t.plain
+    assert "user: " not in t.plain  # labels dropped here too
+    assert getpass.getuser() in t.plain

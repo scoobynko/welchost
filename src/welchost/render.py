@@ -207,8 +207,7 @@ def info_text(cfg: WelchostConfig) -> Text | None:
 
     if cfg.info.layout == "stacked":
         t = Text()
-        for idx, (k, v) in enumerate(items):
-            t.append(f"{k}: ", style="dim")
+        for idx, (_, v) in enumerate(items):
             t.append(str(v))
             if idx != len(items) - 1:
                 t.append("\n")
@@ -216,15 +215,15 @@ def info_text(cfg: WelchostConfig) -> Text | None:
 
     ar, ag, ab = _info_accent_rgb(cfg)
     vr, vg, vb = resolve_color(_banner_color(cfg))
-    label_style = f"rgb({ar},{ag},{ab})"
-    value_style = f"dim rgb({vr},{vg},{vb})"
+    value_style = f"rgb({vr},{vg},{vb})"
     sep_style = f"dim rgb({ar},{ag},{ab})"
     sep = f"  {cfg.info.separator}  "
+    # Values only — the "user"/"date" labels are dropped in the inline layout;
+    # the accent survives on the separators (stacked layout keeps its labels).
     t = Text()
-    for idx, (k, v) in enumerate(items):
+    for idx, (_, v) in enumerate(items):
         if idx:
             t.append(sep, style=sep_style)
-        t.append(f"{k} ", style=label_style)
         t.append(str(v), style=value_style)
     return t
 
