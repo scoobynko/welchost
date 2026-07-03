@@ -88,3 +88,6 @@ def test_info_stacked_is_multiline_values_only(fake_home):
     assert "\n" in t.plain  # one line per item
     assert "user: " not in t.plain  # labels dropped here too
     assert getpass.getuser() in t.plain
+    # values carry the banner color (#3a96dd -> 58,150,221), not default white
+    styles = {str(s.style) for s in t.spans}
+    assert any("58,150,221" in s for s in styles)

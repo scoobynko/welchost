@@ -205,21 +205,22 @@ def info_text(cfg: WelchostConfig) -> Text | None:
     if not items:
         return None
 
+    vr, vg, vb = resolve_color(_banner_color(cfg))
+    value_style = f"rgb({vr},{vg},{vb})"
+
     if cfg.info.layout == "stacked":
         t = Text()
         for idx, (_, v) in enumerate(items):
-            t.append(str(v))
+            t.append(str(v), style=value_style)
             if idx != len(items) - 1:
                 t.append("\n")
         return t
 
     ar, ag, ab = _info_accent_rgb(cfg)
-    vr, vg, vb = resolve_color(_banner_color(cfg))
-    value_style = f"rgb({vr},{vg},{vb})"
     sep_style = f"dim rgb({ar},{ag},{ab})"
     sep = f"  {cfg.info.separator}  "
-    # Values only — the "user"/"date" labels are dropped in the inline layout;
-    # the accent survives on the separators (stacked layout keeps its labels).
+    # Values only — labels are dropped in both layouts; values inherit the banner
+    # colour, and the accent survives on the inline separators.
     t = Text()
     for idx, (_, v) in enumerate(items):
         if idx:

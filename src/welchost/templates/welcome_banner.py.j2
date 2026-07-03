@@ -175,14 +175,16 @@ def info_lines():
     if not items:
         return [], []
 
+    vr, vg, vb = INFO_STYLE["value"]
+    value_c = f"\x1b[38;2;{vr};{vg};{vb}m"
+
     if INFO_STYLE["layout"] == "stacked":
         plain = [str(v) for _, v in items]
-        return plain, list(plain)
+        disp = [f"{value_c}{v}{RESET}" for _, v in items]
+        return plain, disp
 
     ar, ag, ab = INFO_STYLE["accent"]
-    vr, vg, vb = INFO_STYLE["value"]
     sep = INFO_STYLE["separator"]
-    value_c = f"\x1b[38;2;{vr};{vg};{vb}m"
     sep_c = f"\x1b[2;38;2;{ar};{ag};{ab}m"
     # Values only — labels dropped in the inline layout (mirrors render.py).
     plain_parts, disp_parts = [], []
