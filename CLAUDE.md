@@ -103,8 +103,10 @@ welchost/
 - **config.py** - The `WelchostConfig` dataclass mirrors `welchost.toml` exactly.
   `load_config()` reads it (returns `None` if absent), `save_config()` writes it.
   Uses `detect.get_config_dir()` for paths. Depends only on detect.
-- **themes.py** - The 12 named themes as plain data, each convertible to a
-  `WelchostConfig`. No I/O.
+- **themes.py** - The 6 named themes as plain data, each convertible to a
+  `WelchostConfig` (a single-row banner). No I/O.
+- **fit.py** - Width measurement + auto-fit font selection (`art_width`, `fits`,
+  `auto_fit_font`). Core/Textual-free; takes candidate fonts as a parameter.
 - **generator.py** - Renders `welcome.zsh` and `welcome_banner.py` from a config
   via Jinja2, and manages the `~/.zshrc` sentinel block (inject/remove, with
   backup). Uses detect for paths and config for the data. The `reset` logic lives
@@ -172,17 +174,23 @@ Stored at `~/.config/ghostty/welchost.toml` (or `dev-home/.config/ghostty/` in
 DEV mode). It is the **single source of truth**. `welcome.zsh` and
 `welcome_banner.py` are always regenerated from it and must never be hand-edited.
 
+Schema version **2.0.0**. A banner is a **list of stacked rows** (each with its
+own text + color); `font`, `align`, and `fit_width` are shared on `[banner]`.
+
 ```toml
 [banner]
+font = "slant"          # shared across all rows
+align = "left"          # left | center | right  (position on screen)
+fit_width = 80          # target width for the on-save auto-fit safety net (0 = off)
+
+# One [[banner.rows]] table per stacked banner line. The wizard exposes 1-2 rows;
+# the model allows N. Each row carries its own color.
+[[banner.rows]]
 text = "Welcome"
-font = "slant"
-align = "left"         # left | center | right  (position on screen)
-color_mode = "solid"   # solid | gradient
-
-[color.solid]
-value = "cyan"         # Rich color name OR hex "#rrggbb"
-
-[color.gradient]
+color_mode = "solid"    # solid | gradient
+[banner.rows.solid]
+value = "cyan"          # Rich color name OR hex "#rrggbb"
+[banner.rows.gradient]
 start = "cyan"
 end = "magenta"
 direction = "horizontal"   # horizontal | vertical | diagonal
@@ -203,29 +211,35 @@ show_uptime = false
 show_shell = false
 show_python = false
 show_ip = false
+layout = "inline"        # inline | stacked  (inline = styled palette-inheriting row)
+separator = "·"          # glyph between inline items
+accent = "auto"          # auto (inherit banner palette) | Rich color name / hex
 
 [meta]
-welchost_version = "1.0.0"
+welchost_version = "2.0.0"
 created_at = ""          # ISO8601 timestamp set on first save
 ```
 
 ### Valid values
 
 - `banner.align`: `left | center | right` (position of the banner across the terminal width)
-- `banner.color_mode`: `solid | gradient`
-- `color.gradient.direction`: `horizontal | vertical | diagonal`
+- `banner.font`: any pyfiglet font (shared by all rows); `build_figlet` falls back to
+  `standard` if missing.
+- `banner.fit_width`: integer target width; `0` disables the on-save auto-fit.
+- `banner.rows[].color_mode`: `solid | gradient`
+- `banner.rows[].gradient.direction`: `horizontal | vertical | diagonal`
 - `decoration.border_style`: `panel | box | double | rounded | ascii | none`
 - `ornament.name`: `none | ghosts | stars | bars | dots` (predefined ASCII blocks
   flanking the banner; see `welchost/ornaments.py`)
 - Colors: any Rich color name (`cyan`, `bright_green`, `magenta`, …) or `#rrggbb`.
-- `info.*`: all eight flags exist in the schema, but only `show_user` and
-  `show_datetime` default on and are exposed in the wizard; the rest are for TOML
-  power users.
+- `info.*`: all eight `show_*` flags exist; only `show_user` and `show_datetime`
+  default on and are exposed in the wizard; the rest are for TOML power users.
+- `info.layout`: `inline | stacked`. `info.accent`: `auto` (inherit) or a color.
 
-`WelchostConfig` is a dataclass that mirrors this structure (nested dataclasses
-or flat fields - implementer's choice, but round-trip through TOML must be
-lossless). Provide a `DEFAULTS`/`WelchostConfig.default()` factory matching the
-above.
+**Migration:** a pre-2.0 flat config (`banner.text` + `banner.color_mode` +
+top-level `[color.solid]`/`[color.gradient]`) auto-migrates on load into a single
+`[[banner.rows]]`. Round-trip through TOML stays lossless. `WelchostConfig` mirrors
+this structure (`Banner` holds `rows: list[Row]`); provide `WelchostConfig.default()`.
 
 ---
 
@@ -291,13 +305,20 @@ preview in that theme's font/color. `enter` = use as-is → confirm. `c` =
 customize → wizard pre-populated. `/` or typing = search filter.
 
 **Wizard (4 steps, each with a live preview pane at the bottom):**
-1. **text + font + alignment** - text input, font picker (dropdown Select, curated first + all fonts), screen alignment (left/center/right).
-2. **color** - mode (solid | gradient); a `ColorField` dropdown of named preset
-   colors (each with a swatch) + custom hex; for gradient, start/end fields plus
-   a direction picker (horizontal | vertical | diagonal).
-3. **decoration + info** - border style, border color, ornament (flanking ASCII),
-   and the two info-widget toggles (user, date/time).
-4. **confirm** - full preview + file diff summary + **save & install**.
+1. **text + font + alignment** - row-1 text input, an optional second-row text
+   input (stacked row), a shared font picker (dropdown Select, whole pyfiglet
+   catalogue, curated first + type-to-jump), and screen alignment. No visible
+   width/safety controls - width-safety is applied under the hood on save.
+2. **color** - **per row** (one control group per banner row; the second group
+   shows only when a second row exists): mode (solid | gradient); a `ColorField`
+   dropdown of named preset colors + custom hex; for gradient, start/end fields
+   plus a direction picker (horizontal | vertical | diagonal).
+3. **decoration + info** - border style, border color, ornament, the two
+   info-widget toggles (user, date/time), and the metadata-style controls
+   (`layout` inline/stacked, `separator`, `accent`).
+4. **confirm** - full preview + file diff summary + **save & install**. On save,
+   `_apply_autofit` silently swaps to the largest safe font that fits when the
+   banner would overflow `banner.fit_width` (a font that already fits is untouched).
 
 **Edit menu (config exists):** text & font → step 1 pre-filled; color → step 2;
 decoration & info → step 3; load a theme (replace all); full re-wizard; preview /
@@ -349,17 +370,28 @@ maps to a full `WelchostConfig` and carries a short `blurb`. Every font name mus
 be a valid pyfiglet font (verified by `tests/test_themes.py`), and the whole
 curated font list is validated by `tests/test_generator.py`.
 
-### Curated font shortlist (for the wizard picker)
+### Font catalogue, curated set, and safe set (`welchost/tui/fonts.py`)
 
-Filled first, then classics - all verified valid:
+- `CURATED` - the ~20 filled/classic fonts surfaced first in the picker.
+- `SAFE_FONTS` - a vetted subset of `CURATED` (10) that renders cleanly at a
+  predictable width. **Not** a picker restriction: it is the candidate pool
+  `fit.auto_fit_font` shrinks *to* when a banner would overflow on save. Validated
+  by `tests/test_fonts.py`.
 
-```
-ansi_shadow, ansi_regular, pagga, block, banner3, colossal, slant, doom, big,
-standard, isometric1, 3d_diagonal, epic, univers, shadow, larry3d, straight,
-thin, bulbhead, nancyj
-```
-Plus all 571 via `/` search. `build_figlet()` falls back to `standard` if a font
+The wizard picker offers the **whole** pyfiglet catalogue (`font_options()`,
+curated first, type-to-jump); width safety is handled under the hood on save, so
+the choice isn't restricted. `build_figlet()` falls back to `standard` if a font
 is ever missing, so a bad font name can never crash generation or install.
+
+### Width safety (`welchost/fit.py`, core)
+
+`art_width(cfg, font=None)` measures the widest rendered line (incl. ornament
+flanking); `fits(cfg)` compares it to `banner.fit_width`; `auto_fit_font(cfg,
+candidates)` returns the largest candidate that fits (least-overflow if none fit,
+widest if the target is disabled). `fit.py` is Textual-free and takes its
+candidate list as a parameter (the TUI passes `SAFE_FONTS`), so core never imports
+the font catalogue from `tui/`. Auto-fit runs only on the wizard save path
+(`StepConfirm._apply_autofit`) - a hand-edited `welchost.toml` is never touched.
 
 ---
 
@@ -426,17 +458,19 @@ python3 "${HOME}/.config/ghostty/welcome_banner.py"
 
 ### `welcome_banner.py` (the renderer)
 
-A standalone Python script (depends only on Rich, which the user has via the
-installed welchost venv - or guard the import) that:
-- Builds the pyfiglet text from `banner.text` / `banner.font` (native size).
-- Applies solid color or per-character gradient (the `render_gradient` pattern).
-- Wraps in the chosen border (`panel`/`box`/`double`/`rounded`/`ascii`/`none`)
-  via a Rich `Panel` (or plain for `none`).
-- Positions the whole block across the terminal width per `banner.align`
-  (`left`/`center`/`right`).
-- Appends the enabled info lines (`show_user`, `show_host`, `show_os`,
-  `show_datetime`, `show_uptime`, `show_shell`, `show_python`, `show_ip`).
-- Prints to stdout via a Rich `Console`.
+A standalone Python script with **NO third-party imports** (pure-Python ANSI, so
+it runs under whatever `python3` Ghostty's shell finds; guarded by
+`test_generated_banner_is_self_contained`) that:
+- Carries the pyfiglet art **baked in** at generation time as a `ROWS` list (one
+  dict per stacked row: art + color spec), so no pyfiglet at runtime.
+- Colors each row's block by its own solid color or per-character gradient (the
+  same `_factor`/blend math as `render.py`).
+- Stacks the rows (blank line between), flanks with the ornament, wraps in the
+  chosen border drawn with box-drawing glyphs (or plain for `none`).
+- Positions the whole block across the terminal width per `banner.align`.
+- Appends the enabled info as a styled inline row (or legacy stacked lines when
+  `info.layout == "stacked"`), inheriting the banner palette.
+- Prints to stdout with plain `print()`.
 
 Both files are rendered from Jinja2 templates in `src/welchost/templates/` with
 the config values baked in. **Users must never edit `welcome_banner.py`
@@ -519,7 +553,7 @@ Run: `pip install -e ".[dev]" && pytest`.
 - **test_detect.py** - Ghostty detection; DEV vs normal path resolution.
 - **test_dev_mode.py** - `--dev` writes to `dev-home/` not `~`; `--dev reset`
   wipes `dev-home/` only; `dev-home/` auto-created; `ghostty_installed()` True in DEV.
-- **test_themes.py** - all 12 themes load and every font name is a valid pyfiglet
+- **test_themes.py** - all 6 themes load and every font name is a valid pyfiglet
   font.
 
 Key invariants to protect: sentinel idempotency, DEV isolation, lossless config
