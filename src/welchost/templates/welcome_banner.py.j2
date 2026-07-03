@@ -14,19 +14,16 @@ import sys
 from datetime import datetime
 
 # --- baked-in config (from welchost.toml) -----------------------------------
-ART = {{ art_json }}
+# ROWS: one dict per stacked banner row.
+ROWS = {{ rows }}
 ALIGN = "{{ align }}"
-COLOR_MODE = "{{ color_mode }}"
-GRAD_DIR = "{{ grad_direction }}"
-SOLID_RGB = {{ solid_rgb }}
-GRAD_START = {{ grad_start_rgb }}
-GRAD_END = {{ grad_end_rgb }}
 BORDER_STYLE = "{{ border_style }}"
 BORDER_RGB = {{ border_rgb }}
 ORN_LEFT = {{ orn_left }}
 ORN_RIGHT = {{ orn_right }}
 ORN_RGB = {{ orn_rgb }}
 INFO = {{ info }}
+INFO_STYLE = {{ info_style }}
 
 RESET = "\x1b[0m"
 
@@ -44,42 +41,69 @@ def fg(rgb):
     return f"\x1b[1;38;2;{r};{g};{b}m"
 
 
-def _factor(col, row, dx, dy):
+def _factor(col, row, dx, dy, direction):
     # Position 0→1 of a character within the block, per gradient direction.
-    if GRAD_DIR == "vertical":
+    if direction == "vertical":
         return row / dy
-    if GRAD_DIR == "diagonal":
+    if direction == "diagonal":
         return (col / dx + row / dy) / 2
     return col / dx  # horizontal (default)
 
 
-def colorize_line(line, row=0, nrows=1, maxw=1):
-    if not line:
-        return line
-    if COLOR_MODE == "gradient":
-        dx = max(maxw - 1, 1)
-        dy = max(nrows - 1, 1)
+def colorize_block(lines, cfg):
+    # Color one row's art block by its own mode/colors. Returns colored lines.
+    mode = cfg["color_mode"]
+    if mode == "gradient":
+        gs, ge, gd = cfg["grad_start"], cfg["grad_end"], cfg["grad_dir"]
+        dx = max(max((len(ln) for ln in lines), default=1) - 1, 1)
+        dy = max(len(lines) - 1, 1)
         out = []
-        for col, ch in enumerate(line):
-            t = _factor(col, row, dx, dy)
-            r = round(GRAD_START[0] + (GRAD_END[0] - GRAD_START[0]) * t)
-            g = round(GRAD_START[1] + (GRAD_END[1] - GRAD_START[1]) * t)
-            b = round(GRAD_START[2] + (GRAD_END[2] - GRAD_START[2]) * t)
-            out.append(f"\x1b[1;38;2;{r};{g};{b}m{ch}")
-        return "".join(out) + RESET
-    return fg(SOLID_RGB) + line + RESET
+        for row, line in enumerate(lines):
+            if not line:
+                out.append(line)
+                continue
+            chars = []
+            for col, ch in enumerate(line):
+                t = _factor(col, row, dx, dy, gd)
+                r = round(gs[0] + (ge[0] - gs[0]) * t)
+                g = round(gs[1] + (ge[1] - gs[1]) * t)
+                b = round(gs[2] + (ge[2] - gs[2]) * t)
+                chars.append(f"\x1b[1;38;2;{r};{g};{b}m{ch}")
+            out.append("".join(chars) + RESET)
+        return out
+    sc = fg(cfg["solid"])
+    return [(sc + line + RESET) if line else line for line in lines]
+
+
+def _strip_block(art):
+    lines = art.splitlines()
+    while lines and lines[-1].strip() == "":
+        lines.pop()
+    while lines and lines[0].strip() == "":
+        lines.pop(0)
+    return lines
+
+
+def build_rows():
+    # Returns (plain_lines, colored_lines): the stacked art for all rows with one
+    # blank separator between rows. Plain lines are used for width/border math.
+    plain, colored = [], []
+    for i, cfg in enumerate(ROWS):
+        if i:
+            plain.append("")
+            colored.append("")
+        block = _strip_block(cfg["art"])
+        plain.extend(block)
+        colored.extend(colorize_block(block, cfg))
+    return plain, colored
 
 
 def visible_len(s):
-    # length of the raw (uncolored) string; ART lines are stored uncolored
+    # length of the raw (uncolored) string; plain lines are stored uncolored
     return len(s)
 
 
 def align_pad(box_width):
-    # Leading spaces to position the whole box within the terminal width. This
-    # script runs on every interactive shell, so the default left alignment does
-    # zero work — shutil is imported and the terminal size queried only when the
-    # banner is actually centered or right-aligned.
     if ALIGN == "left":
         return ""
     import shutil
@@ -97,8 +121,6 @@ def align_pad(box_width):
 
 
 def flank(art_lines, colored, artw):
-    # Place ORN_LEFT/ORN_RIGHT either side of the art, centered vertically.
-    # Returns (plain_lines, display_lines); plain is used for width/border math.
     lw = max((len(s) for s in ORN_LEFT), default=0)
     rw = max((len(s) for s in ORN_RIGHT), default=0)
     total = max(len(art_lines), len(ORN_LEFT), len(ORN_RIGHT))
@@ -130,26 +152,50 @@ def flank(art_lines, colored, artw):
 
 
 def info_lines():
-    lines = []
+    # Returns (plain_lines, disp_lines). Plain is used for width/border math;
+    # disp carries the ANSI styling. Mirrors render.py's info_text.
+    items = []
     if INFO.get("show_user"):
-        lines.append(("user", getpass.getuser()))
+        items.append(("user", getpass.getuser()))
     if INFO.get("show_host"):
-        lines.append(("host", socket.gethostname()))
+        items.append(("host", socket.gethostname()))
     if INFO.get("show_os"):
         mac = platform.mac_ver()[0]
-        osname = f"macOS {mac}" if mac else platform.platform(terse=True)
-        lines.append(("os", osname))
+        items.append(("os", f"macOS {mac}" if mac else platform.platform(terse=True)))
     if INFO.get("show_datetime"):
-        lines.append(("date", datetime.now().strftime("%a %d %b %Y · %H:%M")))
+        items.append(("date", datetime.now().strftime("%a %d %b %Y · %H:%M")))
     if INFO.get("show_uptime"):
-        lines.append(("uptime", _uptime()))
+        items.append(("uptime", _uptime()))
     if INFO.get("show_shell"):
-        lines.append(("shell", os.environ.get("SHELL", "?")))
+        items.append(("shell", os.environ.get("SHELL", "?")))
     if INFO.get("show_python"):
-        lines.append(("python", platform.python_version()))
+        items.append(("python", platform.python_version()))
     if INFO.get("show_ip"):
-        lines.append(("ip", _local_ip()))
-    return [f"{k}: {v}" for k, v in lines]
+        items.append(("ip", _local_ip()))
+    if not items:
+        return [], []
+
+    if INFO_STYLE["layout"] == "stacked":
+        plain = [f"{k}: {v}" for k, v in items]
+        disp = [f"\x1b[2m{k}: {RESET}{v}" for k, v in items]
+        return plain, disp
+
+    ar, ag, ab = INFO_STYLE["accent"]
+    vr, vg, vb = INFO_STYLE["value"]
+    sep = INFO_STYLE["separator"]
+    label_c = f"\x1b[38;2;{ar};{ag};{ab}m"
+    value_c = f"\x1b[2;38;2;{vr};{vg};{vb}m"
+    sep_c = f"\x1b[2;38;2;{ar};{ag};{ab}m"
+    plain_parts, disp_parts = [], []
+    for idx, (k, v) in enumerate(items):
+        if idx:
+            plain_parts.append(f"  {sep}  ")
+            disp_parts.append(f"{sep_c}  {sep}  {RESET}")
+        plain_parts.append(f"{k} ")
+        disp_parts.append(f"{label_c}{k} {RESET}")
+        plain_parts.append(str(v))
+        disp_parts.append(f"{value_c}{v}{RESET}")
+    return ["".join(plain_parts)], ["".join(disp_parts)]
 
 
 def _uptime():
@@ -174,37 +220,26 @@ def _local_ip():
 
 
 def render():
-    art_lines = [ln for ln in ART.splitlines() if ln.strip("")]
-    # strip trailing blank lines but keep internal shape
-    while art_lines and art_lines[-1].strip() == "":
-        art_lines.pop()
-    while art_lines and art_lines[0].strip() == "":
-        art_lines.pop(0)
-
-    # Gradient is positioned across the art block only (info lines are plain), so
-    # colorize art lines up front by their row index — this also disambiguates
-    # repeated art lines that a value-based `ln in art_lines` check would confuse.
-    nrows = len(art_lines)
+    art_lines, colored = build_rows()
     artw = max((visible_len(ln) for ln in art_lines), default=0)
-    colored = [colorize_line(ln, row, nrows, artw) for row, ln in enumerate(art_lines)]
 
-    # Flank with ornaments (centered) before measuring width / drawing the border.
     if ORN_LEFT or ORN_RIGHT:
         art_lines, colored = flank(art_lines, colored, artw)
 
-    extra = info_lines()
+    info_plain, info_disp = info_lines()
     body = list(art_lines)
-    if extra:
+    colored_body = list(colored)
+    if info_plain:
         body.append("")
-        body.extend(extra)
+        colored_body.append("")
+        body.extend(info_plain)
+        colored_body.extend(info_disp)
 
     width = max((visible_len(ln) for ln in body), default=0)
 
     if BORDER_STYLE == "none":
         lead = align_pad(width)
-        for ln in colored:
-            print(lead + ln)
-        for ln in extra:
+        for ln in colored_body:
             print(lead + ln)
         return
 
@@ -214,13 +249,11 @@ def render():
     inner = width + pad * 2
     bc = fg(BORDER_RGB) if BORDER_RGB else ""
     bce = RESET if BORDER_RGB else ""
-    lead = align_pad(inner + 2)  # box is the inner width plus the two border cols
+    lead = align_pad(inner + 2)
 
     print(f"{lead}{bc}{tl}{h * inner}{tr}{bce}")
     for idx, ln in enumerate(body):
-        # body == art_lines + ["", *info]; the first len(colored) entries are the
-        # (possibly ornament-flanked) art block, the rest are plain info lines.
-        content = colored[idx] if idx < len(colored) else ln
+        content = colored_body[idx]
         gap = " " * (width - visible_len(ln))
         print(f"{lead}{bc}{v}{bce}{' ' * pad}{content}{gap}{' ' * pad}{bc}{v}{bce}")
     print(f"{lead}{bc}{bl}{h * inner}{br}{bce}")

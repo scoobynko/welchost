@@ -41,6 +41,7 @@ class Wizard(Screen):
        height:auto lets the VerticalScroll measure the full content and scroll. */
     Wizard #steps > * { display: none; height: auto; }
     Wizard #steps Vertical { height: auto; }
+    Wizard .row-color-group { height: auto; padding: 0 0 1 0; }
     Wizard .info-row { layout: horizontal; height: auto; padding: 0 0; }
     Wizard .info-label { padding: 1 0 0 1; }
     Wizard Input, Wizard Select { width: 48; margin: 0 0 1 0; }

@@ -26,24 +26,41 @@ def test_generated_banner_is_self_contained(fake_home):
 
 def test_gradient_direction_baked_into_banner(fake_home):
     cfg = WelchostConfig.default()
-    cfg.banner.color_mode = "gradient"
-    cfg.gradient.direction = "diagonal"
+    cfg.banner.rows[0].color_mode = "gradient"
+    cfg.banner.rows[0].gradient.direction = "diagonal"
     _, banner = generator.write_generated_files(cfg)
-    assert 'GRAD_DIR = "diagonal"' in banner.read_text()
+    assert '"grad_dir": "diagonal"' in banner.read_text()
 
 
 def test_ornament_baked_and_renders(fake_home):
     cfg = WelchostConfig.default()
-    cfg.banner.text = "Hi"
+    cfg.banner.rows[0].text = "Hi"
     cfg.ornament.name = "ghosts"
     _, banner = generator.write_generated_files(cfg)
     src = banner.read_text()
     assert "ORN_LEFT = " in src
     assert ")(" in src  # the ghost ornament glyphs are baked in
-    # the generated script must execute without error
     ns = {"__name__": "not_main"}
     exec(compile(src, "welcome_banner.py", "exec"), ns)
     ns["render"]()
+
+
+def test_two_rows_baked_and_render(fake_home):
+    from welchost.config import Row, SolidColor
+
+    cfg = WelchostConfig.default()
+    cfg.banner.font = "standard"
+    cfg.banner.rows = [
+        Row(text="JAKUB", color_mode="solid", solid=SolidColor(value="red")),
+        Row(text="SALMIK", color_mode="solid", solid=SolidColor(value="blue")),
+    ]
+    _, banner = generator.write_generated_files(cfg)
+    src = banner.read_text()
+    ns = {"__name__": "not_main"}
+    exec(compile(src, "welcome_banner.py", "exec"), ns)
+    assert len(ns["ROWS"]) == 2
+    assert ns["ROWS"][0]["color_mode"] == "solid"
+    ns["render"]()  # must not raise
 
 
 def test_sentinel_idempotent(fake_home):
@@ -148,3 +165,13 @@ def test_curated_fonts_are_all_valid():
 
     invalid = [f for f in CURATED if not generator.font_exists(f)]
     assert invalid == [], f"invalid curated fonts: {invalid}"
+
+
+def test_info_style_baked(fake_home):
+    cfg = WelchostConfig.default()
+    cfg.info.layout = "inline"
+    cfg.info.accent = "#d97757"
+    _, banner = generator.write_generated_files(cfg)
+    src = banner.read_text()
+    assert "INFO_STYLE" in src
+    assert '"layout": "inline"' in src

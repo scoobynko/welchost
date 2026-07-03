@@ -30,6 +30,23 @@ CURATED = [
 ]
 
 
+# A vetted subset of CURATED that renders cleanly and at a predictable width
+# across the usual banner charset — the "won't-break" set shown by default in the
+# wizard. All are filled/block or clean classic fonts verified by tests/test_fonts.py.
+SAFE_FONTS = [
+    "ansi_shadow",
+    "ansi_regular",
+    "block",
+    "banner3",
+    "colossal",
+    "standard",
+    "big",
+    "doom",
+    "slant",
+    "straight",
+]
+
+
 @lru_cache(maxsize=1)
 def all_fonts() -> list[str]:
     """All pyfiglet fonts, sorted."""
@@ -49,3 +66,9 @@ def font_options() -> list[tuple[str, str]]:
     seen = set(CURATED)
     ordered = [*CURATED, *(f for f in all_fonts() if f not in seen)]
     return [(name, name) for name in ordered]
+
+
+@lru_cache(maxsize=1)
+def safe_font_options() -> list[tuple[str, str]]:
+    """(label, value) pairs for the default ("won't-break") font picker."""
+    return [(name, name) for name in SAFE_FONTS]

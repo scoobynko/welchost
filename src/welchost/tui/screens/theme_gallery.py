@@ -63,7 +63,7 @@ class TemplateList(Screen):
         theme = self._theme_from_item(lv.highlighted_child)
         if theme is None:
             return
-        text = self.app.model.banner.text or "Welcome"
+        text = self.app.model.banner.rows[0].text or "Welcome"
         self.app.model = theme.to_config(text=text)
         self.app.refresh_preview()
 

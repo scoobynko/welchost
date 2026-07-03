@@ -15,20 +15,13 @@ import tomli_w
 
 from . import detect
 
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "2.0.0"
 
 VALID_ALIGN = ("left", "center", "right")
 VALID_COLOR_MODES = ("solid", "gradient")
 VALID_GRADIENT_DIRECTIONS = ("horizontal", "vertical", "diagonal")
 VALID_BORDER_STYLES = ("panel", "box", "double", "rounded", "ascii", "none")
-
-
-@dataclass
-class Banner:
-    text: str = "Welcome"
-    font: str = "slant"
-    align: str = "left"
-    color_mode: str = "solid"
+VALID_INFO_LAYOUTS = ("inline", "stacked")
 
 
 @dataclass
@@ -43,6 +36,24 @@ class GradientColor:
     # How the blend runs across the art block: horizontal (left→right per line),
     # vertical (top→bottom), or diagonal (top-left→bottom-right).
     direction: str = "horizontal"
+
+
+@dataclass
+class Row:
+    """One stacked banner line: its text and its own color treatment."""
+
+    text: str = "Welcome"
+    color_mode: str = "solid"  # solid | gradient
+    solid: SolidColor = field(default_factory=SolidColor)
+    gradient: GradientColor = field(default_factory=GradientColor)
+
+
+@dataclass
+class Banner:
+    font: str = "slant"
+    align: str = "left"
+    fit_width: int = 80  # target width for fit checks (0 disables)
+    rows: list[Row] = field(default_factory=lambda: [Row()])
 
 
 @dataclass
@@ -70,6 +81,10 @@ class Info:
     show_shell: bool = False
     show_python: bool = False
     show_ip: bool = False
+    # Styling (Phase 2): inline row that inherits the banner palette.
+    layout: str = "inline"  # inline | stacked
+    separator: str = "·"
+    accent: str = "auto"  # auto (inherit) | Rich color name / hex
 
 
 @dataclass
@@ -88,13 +103,42 @@ def _build(cls, data: dict):
     return cls(**{k: v for k, v in data.items() if k in names})
 
 
+def _build_row(row: dict) -> Row:
+    return Row(
+        text=row.get("text", "Welcome"),
+        color_mode=row.get("color_mode", "solid"),
+        solid=_build(SolidColor, row.get("solid", {})),
+        gradient=_build(GradientColor, row.get("gradient", {})),
+    )
+
+
+def _build_rows(banner_data: dict, color_data: dict) -> list[Row]:
+    """Build the row list, migrating a legacy flat banner to a single row.
+
+    New configs carry ``banner.rows``. A pre-2.0 config has ``banner.text`` +
+    ``banner.color_mode`` and top-level ``[color.solid]`` / ``[color.gradient]``;
+    fold those into one row so old installs keep working.
+    """
+    raw_rows = banner_data.get("rows")
+    if raw_rows:
+        return [_build_row(r) for r in raw_rows]
+    if "text" in banner_data:
+        return [
+            Row(
+                text=banner_data.get("text", "Welcome"),
+                color_mode=banner_data.get("color_mode", "solid"),
+                solid=_build(SolidColor, color_data.get("solid", {})),
+                gradient=_build(GradientColor, color_data.get("gradient", {})),
+            )
+        ]
+    return [Row()]
+
+
 @dataclass
 class WelchostConfig:
     """In-memory representation of welchost.toml."""
 
     banner: Banner = field(default_factory=Banner)
-    solid: SolidColor = field(default_factory=SolidColor)
-    gradient: GradientColor = field(default_factory=GradientColor)
     decoration: Decoration = field(default_factory=Decoration)
     ornament: Ornament = field(default_factory=Ornament)
     info: Info = field(default_factory=Info)
@@ -109,10 +153,19 @@ class WelchostConfig:
     def to_toml_dict(self) -> dict:
         """Build the nested dict matching the TOML layout."""
         return {
-            "banner": asdict(self.banner),
-            "color": {
-                "solid": asdict(self.solid),
-                "gradient": asdict(self.gradient),
+            "banner": {
+                "font": self.banner.font,
+                "align": self.banner.align,
+                "fit_width": self.banner.fit_width,
+                "rows": [
+                    {
+                        "text": r.text,
+                        "color_mode": r.color_mode,
+                        "solid": asdict(r.solid),
+                        "gradient": asdict(r.gradient),
+                    }
+                    for r in self.banner.rows
+                ],
             },
             "decoration": asdict(self.decoration),
             "ornament": asdict(self.ornament),
@@ -122,11 +175,16 @@ class WelchostConfig:
 
     @classmethod
     def from_toml_dict(cls, data: dict) -> WelchostConfig:
-        color = data.get("color", {})
+        banner_data = data.get("banner", {})
+        rows = _build_rows(banner_data, data.get("color", {}))
+        banner = Banner(
+            font=banner_data.get("font", "slant"),
+            align=banner_data.get("align", "left"),
+            fit_width=int(banner_data.get("fit_width", 80)),
+            rows=rows,
+        )
         return cls(
-            banner=_build(Banner, data.get("banner", {})),
-            solid=_build(SolidColor, color.get("solid", {})),
-            gradient=_build(GradientColor, color.get("gradient", {})),
+            banner=banner,
             decoration=_build(Decoration, data.get("decoration", {})),
             ornament=_build(Ornament, data.get("ornament", {})),
             info=_build(Info, data.get("info", {})),

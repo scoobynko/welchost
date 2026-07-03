@@ -15,6 +15,7 @@ from .config import (
     GradientColor,
     Info,
     Ornament,
+    Row,
     SolidColor,
     WelchostConfig,
 )
@@ -53,10 +54,9 @@ class Theme:
             end=self.gradient_end or "magenta",
             direction=self.gradient_direction,
         )
+        row = Row(text=text, color_mode=color_mode, solid=solid, gradient=gradient)
         return WelchostConfig(
-            banner=Banner(text=text, font=self.font, color_mode=color_mode),
-            solid=solid,
-            gradient=gradient,
+            banner=Banner(font=self.font, rows=[row]),
             decoration=Decoration(border_style=self.border_style, border_color=self.border_color),
             ornament=Ornament(name=self.ornament),
             info=Info(),

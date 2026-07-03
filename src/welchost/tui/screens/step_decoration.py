@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Label, Select, Switch
+from textual.widgets import Input, Label, Select, Switch
 
+from ...config import VALID_INFO_LAYOUTS
 from ...ornaments import VALID_ORNAMENTS
 from ..widgets import ColorField, apply_visibility
 
@@ -49,6 +50,15 @@ class StepDecoration(Vertical):
             with Vertical(classes="info-row"):
                 yield Switch(value=getattr(m.info, field), id=f"info-{field}")
                 yield Label(label, classes="info-label")
+        yield Label("metadata style", classes="section-label")
+        yield Select(
+            [(layout, layout) for layout in VALID_INFO_LAYOUTS],
+            id="info-layout",
+            value=m.info.layout,
+            allow_blank=False,
+        )
+        yield Input(m.info.separator, placeholder="·", id="info-separator")
+        yield Input(m.info.accent, placeholder="auto or #rrggbb", id="info-accent")
 
     def on_mount(self) -> None:
         self._sync_border_color()
@@ -60,6 +70,9 @@ class StepDecoration(Vertical):
         self.query_one("#ornament", Select).value = m.ornament.name
         for field, _ in INFO_FIELDS:
             self.query_one(f"#info-{field}", Switch).value = getattr(m.info, field)
+        self.query_one("#info-layout", Select).value = m.info.layout
+        self.query_one("#info-separator", Input).value = m.info.separator
+        self.query_one("#info-accent", Input).value = m.info.accent
         self._sync_border_color()
 
     def _sync_border_color(self) -> None:
@@ -78,10 +91,21 @@ class StepDecoration(Vertical):
         elif event.select.id == "ornament":
             self.app.model.ornament.name = str(event.value)
             self.app.refresh_preview()
+        elif event.select.id == "info-layout":
+            self.app.model.info.layout = str(event.value)
+            self.app.refresh_preview()
 
     def on_color_field_changed(self, event: ColorField.Changed) -> None:
         if event.field.id == "border_color":
             self.app.model.decoration.border_color = event.value or "magenta"
+            self.app.refresh_preview()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "info-separator":
+            self.app.model.info.separator = event.value or "·"
+            self.app.refresh_preview()
+        elif event.input.id == "info-accent":
+            self.app.model.info.accent = event.value or "auto"
             self.app.refresh_preview()
 
     def on_switch_changed(self, event: Switch.Changed) -> None:
