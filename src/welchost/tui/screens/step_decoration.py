@@ -50,14 +50,16 @@ class StepDecoration(Vertical):
             with Vertical(classes="info-row"):
                 yield Switch(value=getattr(m.info, field), id=f"info-{field}")
                 yield Label(label, classes="info-label")
-        yield Label("metadata style", classes="section-label")
+        yield Label("metadata layout  (inline row · or stacked lines)", classes="section-label")
         yield Select(
             [(layout, layout) for layout in VALID_INFO_LAYOUTS],
             id="info-layout",
             value=m.info.layout,
             allow_blank=False,
         )
+        yield Label("metadata separator  (glyph between inline items)", classes="section-label")
         yield Input(m.info.separator, placeholder="·", id="info-separator")
+        yield Label("metadata accent  (auto = match banner · or a color)", classes="section-label")
         yield Input(m.info.accent, placeholder="auto or #rrggbb", id="info-accent")
 
     def on_mount(self) -> None:
