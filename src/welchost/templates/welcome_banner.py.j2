@@ -154,45 +154,45 @@ def flank(art_lines, colored, artw):
 def info_lines():
     # Returns (plain_lines, disp_lines). Plain is used for width/border math;
     # disp carries the ANSI styling. Mirrors render.py's info_text.
-    items = []
+    values = []
     if INFO.get("show_user"):
-        items.append(("user", getpass.getuser()))
+        values.append(getpass.getuser())
     if INFO.get("show_host"):
-        items.append(("host", socket.gethostname()))
+        values.append(socket.gethostname())
     if INFO.get("show_os"):
         mac = platform.mac_ver()[0]
-        items.append(("os", f"macOS {mac}" if mac else platform.platform(terse=True)))
+        values.append(f"macOS {mac}" if mac else platform.platform(terse=True))
     if INFO.get("show_datetime"):
-        items.append(("date", datetime.now().strftime("%a %d %b %Y · %H:%M")))
+        values.append(datetime.now().strftime("%a %d %b %Y · %H:%M"))
     if INFO.get("show_uptime"):
-        items.append(("uptime", _uptime()))
+        values.append(_uptime())
     if INFO.get("show_shell"):
-        items.append(("shell", os.environ.get("SHELL", "?")))
+        values.append(os.environ.get("SHELL", "?"))
     if INFO.get("show_python"):
-        items.append(("python", platform.python_version()))
+        values.append(platform.python_version())
     if INFO.get("show_ip"):
-        items.append(("ip", _local_ip()))
-    if not items:
+        values.append(_local_ip())
+    if not values:
         return [], []
 
     vr, vg, vb = INFO_STYLE["value"]
     value_c = f"\x1b[38;2;{vr};{vg};{vb}m"
 
     if INFO_STYLE["layout"] == "stacked":
-        plain = [str(v) for _, v in items]
-        disp = [f"{value_c}{v}{RESET}" for _, v in items]
+        plain = list(values)
+        disp = [f"{value_c}{v}{RESET}" for v in values]
         return plain, disp
 
     ar, ag, ab = INFO_STYLE["accent"]
     sep = INFO_STYLE["separator"]
     sep_c = f"\x1b[2;38;2;{ar};{ag};{ab}m"
-    # Values only — labels dropped in the inline layout (mirrors render.py).
+    # Values only — labels dropped (mirrors render.py); accent on the separators.
     plain_parts, disp_parts = [], []
-    for idx, (_, v) in enumerate(items):
+    for idx, v in enumerate(values):
         if idx:
             plain_parts.append(f"  {sep}  ")
             disp_parts.append(f"{sep_c}  {sep}  {RESET}")
-        plain_parts.append(str(v))
+        plain_parts.append(v)
         disp_parts.append(f"{value_c}{v}{RESET}")
     return ["".join(plain_parts)], ["".join(disp_parts)]
 
