@@ -163,27 +163,29 @@ def render_art(cfg: WelchostConfig) -> Text:
     return block
 
 
-def _info_items(cfg: WelchostConfig) -> list[tuple[str, str]]:
-    rows: list[tuple[str, str]] = []
+def _info_values(cfg: WelchostConfig) -> list[str]:
+    """The enabled info values, in order. Labels were dropped from the footer, so
+    only the values are rendered."""
+    values: list[str] = []
     i = cfg.info
     if i.show_user:
-        rows.append(("user", getpass.getuser()))
+        values.append(getpass.getuser())
     if i.show_host:
-        rows.append(("host", socket.gethostname()))
+        values.append(socket.gethostname())
     if i.show_os:
         mac = platform.mac_ver()[0]
-        rows.append(("os", f"macOS {mac}" if mac else platform.system()))
+        values.append(f"macOS {mac}" if mac else platform.system())
     if i.show_datetime:
-        rows.append(("date", datetime.now().strftime("%a %d %b %Y · %H:%M")))
+        values.append(datetime.now().strftime("%a %d %b %Y · %H:%M"))
     if i.show_uptime:
-        rows.append(("uptime", "…"))
+        values.append("…")
     if i.show_shell:
-        rows.append(("shell", os.environ.get("SHELL", "?")))
+        values.append(os.environ.get("SHELL", "?"))
     if i.show_python:
-        rows.append(("python", platform.python_version()))
+        values.append(platform.python_version())
     if i.show_ip:
-        rows.append(("ip", "…"))
-    return rows
+        values.append("…")
+    return values
 
 
 def _banner_color(cfg: WelchostConfig) -> str:
@@ -201,31 +203,31 @@ def _info_accent_rgb(cfg: WelchostConfig) -> tuple[int, int, int]:
 
 
 def info_text(cfg: WelchostConfig) -> Text | None:
-    items = _info_items(cfg)
-    if not items:
+    # Labels are dropped in both layouts; values inherit the banner colour, and
+    # the accent survives on the inline separators.
+    values = _info_values(cfg)
+    if not values:
         return None
+
+    vr, vg, vb = resolve_color(_banner_color(cfg))
+    value_style = f"rgb({vr},{vg},{vb})"
 
     if cfg.info.layout == "stacked":
         t = Text()
-        for idx, (k, v) in enumerate(items):
-            t.append(f"{k}: ", style="dim")
-            t.append(str(v))
-            if idx != len(items) - 1:
+        for idx, v in enumerate(values):
+            t.append(v, style=value_style)
+            if idx != len(values) - 1:
                 t.append("\n")
         return t
 
     ar, ag, ab = _info_accent_rgb(cfg)
-    vr, vg, vb = resolve_color(_banner_color(cfg))
-    label_style = f"rgb({ar},{ag},{ab})"
-    value_style = f"dim rgb({vr},{vg},{vb})"
     sep_style = f"dim rgb({ar},{ag},{ab})"
     sep = f"  {cfg.info.separator}  "
     t = Text()
-    for idx, (k, v) in enumerate(items):
+    for idx, v in enumerate(values):
         if idx:
             t.append(sep, style=sep_style)
-        t.append(f"{k} ", style=label_style)
-        t.append(str(v), style=value_style)
+        t.append(v, style=value_style)
     return t
 
 
