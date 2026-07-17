@@ -20,6 +20,10 @@ Ghostty launches
       → banner renders in your terminal
 ```
 
+## Demo
+
+https://github.com/user-attachments/assets/e759939e-3adb-419f-9b11-678fff1db3c1
+
 ---
 
 # For users
